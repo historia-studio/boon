@@ -9,7 +9,7 @@ import Config
 
 config :boon,
   ecto_repos: [Boon.Repo],
-  ash_domains: [Boon.Operations],
+  ash_domains: [Boon.Accounts, Boon.Operations],
   generators: [timestamp_type: :utc_datetime]
 
 config :ex_cldr, default_backend: Boon.Cldr

@@ -31,6 +31,10 @@ defmodule BoonWeb.Layouts do
     default: nil,
     doc: "the current [scope](https://hexdocs.pm/phoenix/scopes.html)"
 
+  attr :current_user, :map,
+    default: nil,
+    doc: "the signed-in operator"
+
   slot :inner_block, required: true
 
   def app(assigns) do
@@ -50,38 +54,50 @@ defmodule BoonWeb.Layouts do
             </.link>
           </div>
 
-          <nav class="flex flex-wrap items-center gap-2 text-sm">
-            <.link
-              navigate={~p"/"}
-              class="rounded-full px-4 py-2 text-stone-300 transition hover:bg-white/5 hover:text-white"
-            >
-              Dashboard
-            </.link>
-            <.link
-              navigate={~p"/intake"}
-              class="rounded-full px-4 py-2 text-stone-300 transition hover:bg-white/5 hover:text-white"
-            >
-              Intake
-            </.link>
-            <.link
-              navigate={~p"/work-packages"}
-              class="rounded-full px-4 py-2 text-stone-300 transition hover:bg-white/5 hover:text-white"
-            >
-              Work Packages
-            </.link>
-            <.link
-              navigate={~p"/review"}
-              class="rounded-full px-4 py-2 text-stone-300 transition hover:bg-white/5 hover:text-white"
-            >
-              Review
-            </.link>
-            <.link
-              navigate={~p"/ship"}
-              class="rounded-full px-4 py-2 text-stone-300 transition hover:bg-white/5 hover:text-white"
-            >
-              Ship
-            </.link>
-          </nav>
+          <div class="flex flex-wrap items-center gap-4">
+            <nav class="flex flex-wrap items-center gap-2 text-sm">
+              <.link
+                navigate={~p"/"}
+                class="rounded-full px-4 py-2 text-stone-300 transition hover:bg-white/5 hover:text-white"
+              >
+                Dashboard
+              </.link>
+              <.link
+                navigate={~p"/intake"}
+                class="rounded-full px-4 py-2 text-stone-300 transition hover:bg-white/5 hover:text-white"
+              >
+                Intake
+              </.link>
+              <.link
+                navigate={~p"/work-packages"}
+                class="rounded-full px-4 py-2 text-stone-300 transition hover:bg-white/5 hover:text-white"
+              >
+                Work Packages
+              </.link>
+              <.link
+                navigate={~p"/review"}
+                class="rounded-full px-4 py-2 text-stone-300 transition hover:bg-white/5 hover:text-white"
+              >
+                Review
+              </.link>
+              <.link
+                navigate={~p"/ship"}
+                class="rounded-full px-4 py-2 text-stone-300 transition hover:bg-white/5 hover:text-white"
+              >
+                Ship
+              </.link>
+            </nav>
+
+            <%= if @current_user do %>
+              <div class="flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-stone-300">
+                <span class="text-stone-500">Signed in as</span>
+                <span class="font-semibold text-white">{@current_user.username}</span>
+                <.link href={~p"/sign-out"} class="text-amber-300 transition hover:text-amber-200">
+                  Sign out
+                </.link>
+              </div>
+            <% end %>
+          </div>
         </div>
       </header>
 

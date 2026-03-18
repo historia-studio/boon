@@ -1,10 +1,12 @@
 defmodule BoonWeb.Router do
   use BoonWeb, :router
+  use AshAuthentication.Phoenix.Router
 
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
     plug :fetch_live_flash
+    plug :load_from_session
     plug :put_root_layout, html: {BoonWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
@@ -17,11 +19,21 @@ defmodule BoonWeb.Router do
   scope "/", BoonWeb do
     pipe_through :browser
 
-    live "/", DashboardLive
-    live "/intake", IntakeLive
-    live "/work-packages", WorkPackageLive.Index
-    live "/review", ReviewLive
-    live "/ship", ShipLive
+    auth_routes AuthController, Boon.Accounts.User, path: "/auth"
+    sign_out_route AuthController
+
+    sign_in_route register_path: "/register",
+                  auth_routes_prefix: "/auth",
+                  on_mount: [{BoonWeb.LiveUserAuth, :live_no_user}]
+
+    ash_authentication_live_session :authenticated_routes,
+      on_mount: {BoonWeb.LiveUserAuth, :live_user_required} do
+      live "/", DashboardLive
+      live "/intake", IntakeLive
+      live "/work-packages", WorkPackageLive.Index
+      live "/review", ReviewLive
+      live "/ship", ShipLive
+    end
   end
 
   # Other scopes may use custom stacks.

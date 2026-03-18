@@ -8,6 +8,7 @@ defmodule Boon.Application do
   @impl true
   def start(_type, _args) do
     children = [
+      {AshAuthentication.Supervisor, otp_app: :boon},
       BoonWeb.Telemetry,
       Boon.Repo,
       {DNSCluster, query: Application.get_env(:boon, :dns_cluster_query) || :ignore},
