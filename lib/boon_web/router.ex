@@ -17,7 +17,11 @@ defmodule BoonWeb.Router do
   scope "/", BoonWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
+    live "/", DashboardLive
+    live "/intake", IntakeLive
+    live "/work-packages", WorkPackageLive.Index
+    live "/review", ReviewLive
+    live "/ship", ShipLive
   end
 
   # Other scopes may use custom stacks.

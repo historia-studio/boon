@@ -3,6 +3,11 @@ defmodule BoonWeb.PageControllerTest do
 
   test "GET /", %{conn: conn} do
     conn = get(conn, ~p"/")
-    assert html_response(conn, 200) =~ "Peace of mind from prototype to production"
+    response = html_response(conn, 200)
+
+    assert response =~ "Powdercoating Operations"
+
+    assert response =~
+             "Build the operator workspace before intake, printing, and shipping logic lands."
   end
 end

@@ -9,6 +9,7 @@ import Config
 
 config :boon,
   ecto_repos: [Boon.Repo],
+  ash_domains: [Boon.Operations],
   generators: [timestamp_type: :utc_datetime]
 
 config :ex_cldr, default_backend: Boon.Cldr
@@ -63,6 +64,8 @@ config :logger, :default_formatter,
 
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
+
+config :phoenix_live_view, :colocated_js, disable_symlink_warning: true
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
