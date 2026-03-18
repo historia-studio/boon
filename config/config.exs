@@ -11,6 +11,10 @@ config :boon,
   ecto_repos: [Boon.Repo],
   generators: [timestamp_type: :utc_datetime]
 
+config :ex_cldr, default_backend: Boon.Cldr
+
+config :ex_money, default_cldr_backend: Boon.Cldr
+
 # Configure the endpoint
 config :boon, BoonWeb.Endpoint,
   url: [host: "localhost"],
