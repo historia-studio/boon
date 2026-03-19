@@ -43,13 +43,15 @@ defmodule BoonWeb.Layouts do
               <div class="flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-400/40 bg-amber-300/10 text-amber-200">
                 <.icon name="hero-cube-transparent" class="h-5 w-5" />
               </div>
+              
               <div>
                 <p class="text-xs uppercase tracking-[0.3em] text-stone-400">Boon</p>
+                
                 <p class="text-sm font-semibold text-stone-100">Powdercoating Operations</p>
               </div>
             </.link>
           </div>
-
+          
           <nav class="flex flex-wrap items-center gap-2 text-sm">
             <.link
               navigate={~p"/"}
@@ -84,12 +86,9 @@ defmodule BoonWeb.Layouts do
           </nav>
         </div>
       </header>
-
-      <main class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {render_slot(@inner_block)}
-      </main>
-
-      <.flash_group flash={@flash} />
+      
+      <main class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">{render_slot(@inner_block)}</main>
+       <.flash_group flash={@flash} />
     </div>
     """
   end
@@ -119,7 +118,7 @@ defmodule BoonWeb.Layouts do
         {gettext("Attempting to reconnect")}
         <.icon name="hero-arrow-path" class="ml-1 size-3 motion-safe:animate-spin" />
       </.flash>
-
+      
       <.flash
         id="server-error"
         kind={:error}

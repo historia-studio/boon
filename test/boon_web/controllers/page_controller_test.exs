@@ -6,8 +6,7 @@ defmodule BoonWeb.PageControllerTest do
     response = html_response(conn, 200)
 
     assert response =~ "Powdercoating Operations"
-
-    assert response =~
-             "Build the operator workspace before intake, printing, and shipping logic lands."
+    assert response =~ "Capture work packages by hand now"
+    assert response =~ "Manual intake is available now"
   end
 end
