@@ -2,14 +2,19 @@ defmodule BoonWeb.IntakeLive do
   use BoonWeb, :live_view
 
   alias Boon.Operations
+  alias Boon.PDF.IntakeParser
 
   @impl true
   def mount(_params, _session, socket) do
     {:ok,
      socket
+     |> allow_upload(:purchase_order_pdf, accept: ~w(.pdf), max_entries: 1)
      |> assign(:current_scope, nil)
      |> assign(:entry, empty_entry())
      |> assign(:form, to_form(%{}, as: :work_package))
+     |> assign(:import_form, to_form(%{}, as: :pdf_import))
+     |> assign(:import_errors, [])
+     |> assign(:import_warnings, [])
      |> assign(:save_errors, [])
      |> assign(:sample_files, sample_files())}
   end
@@ -19,7 +24,66 @@ defmodule BoonWeb.IntakeLive do
     {:noreply,
      socket
      |> assign(:entry, normalize_entry(params))
+     |> assign(:import_errors, [])
      |> assign(:save_errors, [])}
+  end
+
+  @impl true
+  def handle_event("queue_import_pdf", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:import_errors, [])
+     |> assign(:import_warnings, [])}
+  end
+
+  @impl true
+  def handle_event("import_pdf", _params, socket) do
+    cond do
+      socket.assigns.uploads.purchase_order_pdf.entries == [] ->
+        {:noreply,
+         socket
+         |> assign(:import_errors, ["Select a PDF before starting import."])
+         |> assign(:import_warnings, [])}
+
+      upload_errors?(socket.assigns.uploads.purchase_order_pdf) ->
+        {:noreply,
+         socket
+         |> assign(
+           :import_errors,
+           upload_error_messages(socket.assigns.uploads.purchase_order_pdf)
+         )
+         |> assign(:import_warnings, [])}
+
+      true ->
+        result =
+          socket
+          |> consume_uploaded_entries(:purchase_order_pdf, fn %{path: path}, _entry ->
+            {:ok, IntakeParser.parse_purchase_order(path)}
+          end)
+          |> List.first()
+
+        case result do
+          {:ok, parsed} ->
+            {:noreply,
+             socket
+             |> assign(:entry, import_entry(socket.assigns.entry, parsed))
+             |> assign(:import_errors, [])
+             |> assign(:import_warnings, parsed.warnings)
+             |> assign(:save_errors, [])}
+
+          {:error, error} ->
+            {:noreply,
+             socket
+             |> assign(:import_errors, [error])
+             |> assign(:import_warnings, [])}
+
+          nil ->
+            {:noreply,
+             socket
+             |> assign(:import_errors, ["The PDF upload did not produce any import data."])
+             |> assign(:import_warnings, [])}
+        end
+    end
   end
 
   @impl true
@@ -128,6 +192,88 @@ defmodule BoonWeb.IntakeLive do
                 Start with the operator workflow first: enter the work package number, then add each purchase order and its PO lines exactly as they appear today. ZIP parsing can reuse this same structure afterwards.
               </p>
             </div>
+
+            <BoonWeb.Components.Card.card
+              variant="bordered"
+              color="warning"
+              rounded="large"
+              class="bg-black/15"
+              padding="medium"
+            >
+              <BoonWeb.Components.Card.card_content space="medium">
+                <div class="space-y-2">
+                  <p class="app-kicker text-[0.68rem]">PDF Import</p>
+                  <p class="text-sm text-stone-300">
+                    Upload one purchase-order PDF to prefill the manual intake form. Operators can still correct every field before saving.
+                  </p>
+                </div>
+
+                <.form
+                  for={@import_form}
+                  id="import-form"
+                  phx-change="queue_import_pdf"
+                  phx-submit="import_pdf"
+                  class="space-y-4"
+                >
+                  <div class="space-y-3">
+                    <label
+                      for={@uploads.purchase_order_pdf.ref}
+                      class="block text-sm font-semibold leading-6 text-stone-100"
+                    >
+                      Purchase order PDF
+                    </label>
+
+                    <.live_file_input
+                      upload={@uploads.purchase_order_pdf}
+                      class="block w-full rounded-[1rem] border border-white/10 bg-[#140d0d] px-4 py-3 text-sm text-stone-200 file:mr-4 file:rounded-full file:border-0 file:bg-red-400/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-red-100"
+                    />
+
+                    <p class="text-xs text-stone-500">
+                      The current host parser prefers embedded PDF text and falls back to OCR when the host tools are installed.
+                    </p>
+                  </div>
+
+                  <div
+                    :if={@import_errors != []}
+                    class="rounded-[1rem] border border-rose-300/30 bg-rose-400/10 px-4 py-3 text-sm text-rose-100"
+                  >
+                    <ul class="space-y-1">
+                      <li :for={error <- @import_errors}>{error}</li>
+                    </ul>
+                  </div>
+
+                  <div
+                    :if={@import_warnings != []}
+                    class="rounded-[1rem] border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100"
+                  >
+                    <ul class="space-y-1">
+                      <li :for={warning <- @import_warnings}>{warning}</li>
+                    </ul>
+                  </div>
+
+                  <div
+                    :if={upload_errors?(@uploads.purchase_order_pdf)}
+                    class="rounded-[1rem] border border-rose-300/30 bg-rose-400/10 px-4 py-3 text-sm text-rose-100"
+                  >
+                    <ul class="space-y-1">
+                      <li :for={error <- upload_error_messages(@uploads.purchase_order_pdf)}>
+                        {error}
+                      </li>
+                    </ul>
+                  </div>
+
+                  <BoonWeb.Components.Button.button
+                    type="submit"
+                    variant="shadow"
+                    color="warning"
+                    size="small"
+                    icon="hero-document-arrow-up"
+                  >
+                    Parse PDF Into Form
+                  </BoonWeb.Components.Button.button>
+                </.form>
+              </BoonWeb.Components.Card.card_content>
+            </BoonWeb.Components.Card.card>
 
             <BoonWeb.Components.Card.card
               :if={@save_errors != []}
@@ -671,6 +817,51 @@ defmodule BoonWeb.IntakeLive do
 
   defp ensure_line([]), do: [empty_line()]
   defp ensure_line(lines), do: lines
+
+  defp import_entry(entry, %{purchase_orders: purchase_orders}) do
+    %{
+      "number" => entry["number"],
+      "purchase_orders" => Enum.map(purchase_orders, &stringify_purchase_order/1)
+    }
+  end
+
+  defp stringify_purchase_order(purchase_order) do
+    %{
+      "po_number" => purchase_order.po_number,
+      "order_date" => stringify_date(purchase_order.order_date),
+      "revision_date" => stringify_date(purchase_order.revision_date),
+      "reference" => purchase_order.reference || "",
+      "lines" => Enum.map(purchase_order.lines, &stringify_line/1)
+    }
+  end
+
+  defp stringify_line(line) do
+    %{
+      "line" => Integer.to_string(line.line),
+      "item_number" => line.item_number,
+      "ship_date" => stringify_date(line.ship_date),
+      "quantity" => Integer.to_string(line.quantity)
+    }
+  end
+
+  defp stringify_date(%Date{} = date), do: Date.to_iso8601(date)
+  defp stringify_date(_date), do: ""
+
+  defp upload_errors?(upload) do
+    upload.entries != [] and upload_error_messages(upload) != []
+  end
+
+  defp upload_error_messages(upload) do
+    for entry <- upload.entries,
+        error <- upload_errors(upload, entry) do
+      case error do
+        :too_large -> "The selected PDF is larger than the allowed upload size."
+        :not_accepted -> "Only PDF files are accepted for import."
+        :too_many_files -> "Only one PDF can be imported at a time."
+        other -> "Upload failed: #{inspect(other)}"
+      end
+    end
+  end
 
   defp remove_at(list, index) when is_binary(index), do: remove_at(list, String.to_integer(index))
   defp remove_at(list, index), do: List.delete_at(list, index)

@@ -10,7 +10,13 @@ import Config
 config :boon,
   ecto_repos: [Boon.Repo],
   ash_domains: [Boon.Operations],
-  generators: [timestamp_type: :utc_datetime]
+  generators: [timestamp_type: :utc_datetime],
+  pdf_intake_parser: Boon.PDF.HostParser,
+  pdf_tool_paths: %{
+    pdftoppm: "C:/ProgramData/poppler-25.12.0/Library/bin/pdftoppm.exe",
+    pdftotext: "C:/ProgramData/poppler-25.12.0/Library/bin/pdftotext.exe",
+    tesseract: "C:/Program Files/Tesseract-OCR/tesseract.exe"
+  }
 
 config :ex_cldr, default_backend: Boon.Cldr
 

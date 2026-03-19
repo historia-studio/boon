@@ -5,6 +5,16 @@ defmodule BoonWeb.IntakeLiveTest do
 
   alias Boon.Operations
 
+  setup do
+    original_parser = Application.get_env(:boon, :pdf_intake_parser)
+
+    on_exit(fn ->
+      Application.put_env(:boon, :pdf_intake_parser, original_parser)
+    end)
+
+    :ok
+  end
+
   test "operator can enter a work package with one purchase order and line", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/intake")
 
@@ -47,5 +57,34 @@ defmodule BoonWeb.IntakeLiveTest do
     assert line.line == 1
     assert line.item_number == "86-SA-T1G50064295"
     assert line.quantity == 2
+  end
+
+  test "operator can import a pdf into the intake form before saving", %{conn: conn} do
+    Application.put_env(:boon, :pdf_intake_parser, Boon.PDF.ParserStub)
+
+    {:ok, view, _html} = live(conn, ~p"/intake")
+
+    pdf_path = Path.expand("../../../reference/wp10/63129.pdf", __DIR__)
+
+    upload =
+      file_input(view, "#import-form", :purchase_order_pdf, [
+        %{
+          last_modified: 1_710_000_000_000,
+          name: "63129.pdf",
+          content: File.read!(pdf_path),
+          type: "application/pdf"
+        }
+      ])
+
+    render_upload(upload, "63129.pdf")
+
+    view
+    |> form("#import-form")
+    |> render_submit()
+
+    assert has_element?(view, "#purchase-orders-0-po-number[value='63129']")
+    assert has_element?(view, "#purchase-orders-0-order-date[value='2026-03-12']")
+    assert has_element?(view, "#purchase-orders-0-lines-0-item-number[value='86-SA-T1G50064295']")
+    assert render(view) =~ "Imported with the test parser stub."
   end
 end
