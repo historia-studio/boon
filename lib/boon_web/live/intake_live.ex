@@ -10,14 +10,14 @@ defmodule BoonWeb.IntakeLive do
     {:ok,
      socket
      |> allow_upload(:purchase_order_pdf, accept: ~w(.pdf), max_entries: 1)
+     |> assign(:collapsed_purchase_orders, MapSet.new())
      |> assign(:current_scope, nil)
      |> assign(:entry, empty_entry())
      |> assign(:form, to_form(%{}, as: :work_package))
      |> assign(:import_form, to_form(%{}, as: :pdf_import))
      |> assign(:import_errors, [])
      |> assign(:import_warnings, [])
-     |> assign(:save_errors, [])
-     |> assign(:sample_files, sample_files())}
+     |> assign(:save_errors, [])}
   end
 
   @impl true
@@ -67,6 +67,7 @@ defmodule BoonWeb.IntakeLive do
           {:ok, parsed} ->
             {:noreply,
              socket
+             |> assign(:collapsed_purchase_orders, MapSet.new())
              |> assign(:entry, import_entry(socket.assigns.entry, parsed))
              |> assign(:import_errors, [])
              |> assign(:import_warnings, parsed.warnings)
@@ -91,7 +92,10 @@ defmodule BoonWeb.IntakeLive do
   def handle_event("add_purchase_order", _params, socket) do
     entry = update_in(socket.assigns.entry["purchase_orders"], &(&1 ++ [empty_purchase_order()]))
 
-    {:noreply, assign(socket, :entry, entry)}
+    {:noreply,
+     socket
+     |> assign(:entry, entry)
+     |> assign(:collapsed_purchase_orders, socket.assigns.collapsed_purchase_orders)}
   end
 
   @impl true
@@ -105,7 +109,13 @@ defmodule BoonWeb.IntakeLive do
         put_in(socket.assigns.entry["purchase_orders"], purchase_orders)
       end
 
-    {:noreply, assign(socket, :entry, entry)}
+    {:noreply,
+     socket
+     |> assign(:entry, entry)
+     |> assign(
+       :collapsed_purchase_orders,
+       reindex_collapsed_purchase_orders(socket.assigns.collapsed_purchase_orders, index)
+     )}
   end
 
   @impl true
@@ -144,6 +154,20 @@ defmodule BoonWeb.IntakeLive do
   end
 
   @impl true
+  def handle_event("toggle_purchase_order", %{"index" => index}, socket) do
+    po_index = String.to_integer(index)
+
+    collapsed_purchase_orders =
+      if MapSet.member?(socket.assigns.collapsed_purchase_orders, po_index) do
+        MapSet.delete(socket.assigns.collapsed_purchase_orders, po_index)
+      else
+        MapSet.put(socket.assigns.collapsed_purchase_orders, po_index)
+      end
+
+    {:noreply, assign(socket, :collapsed_purchase_orders, collapsed_purchase_orders)}
+  end
+
+  @impl true
   def handle_event("save", %{"work_package" => params}, socket) do
     entry = normalize_entry(params)
 
@@ -166,7 +190,7 @@ defmodule BoonWeb.IntakeLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <section class="grid gap-8 xl:grid-cols-[1.2fr_0.8fr]">
+      <section class="mx-auto max-w-[1100px]">
         <BoonWeb.Components.Card.card
           variant="gradient"
           color="danger"
@@ -176,22 +200,7 @@ defmodule BoonWeb.IntakeLive do
         >
           <BoonWeb.Components.Card.card_content space="large">
             <div class="space-y-4">
-              <BoonWeb.Components.Badge.badge
-                color="warning"
-                variant="bordered"
-                rounded="full"
-                class="w-fit text-[0.68rem] font-medium uppercase tracking-[0.24em]"
-              >
-                Intake
-              </BoonWeb.Components.Badge.badge>
-
-              <h1 class="text-3xl font-semibold text-stone-50 sm:text-4xl">
-                Manual work package data entry
-              </h1>
-
-              <p class="max-w-3xl text-sm leading-8 text-red-50/76">
-                Start with the operator workflow first: enter the work package number, then add each purchase order and its PO lines exactly as they appear today. ZIP parsing can reuse this same structure afterwards.
-              </p>
+              <h1 class="text-3xl font-semibold text-stone-50 sm:text-4xl">Work Package Entry</h1>
             </div>
 
             <BoonWeb.Components.Card.card
@@ -202,12 +211,7 @@ defmodule BoonWeb.IntakeLive do
               padding="medium"
             >
               <BoonWeb.Components.Card.card_content space="medium">
-                <div class="space-y-2">
-                  <p class="app-kicker text-[0.68rem]">PDF Import</p>
-                  <p class="text-sm text-stone-300">
-                    Upload one purchase-order PDF to prefill the manual intake form. Operators can still correct every field before saving.
-                  </p>
-                </div>
+                <p class="app-kicker text-[0.68rem]">PDF Import</p>
 
                 <.form
                   for={@import_form}
@@ -217,21 +221,10 @@ defmodule BoonWeb.IntakeLive do
                   class="space-y-4"
                 >
                   <div class="space-y-3">
-                    <label
-                      for={@uploads.purchase_order_pdf.ref}
-                      class="block text-sm font-semibold leading-6 text-stone-100"
-                    >
-                      Purchase order PDF
-                    </label>
-
                     <.live_file_input
                       upload={@uploads.purchase_order_pdf}
                       class="block w-full rounded-[1rem] border border-white/10 bg-[#140d0d] px-4 py-3 text-sm text-stone-200 file:mr-4 file:rounded-full file:border-0 file:bg-red-400/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-red-100"
                     />
-
-                    <p class="text-xs text-stone-500">
-                      The current host parser prefers embedded PDF text and falls back to OCR when the host tools are installed.
-                    </p>
                   </div>
 
                   <div
@@ -305,7 +298,7 @@ defmodule BoonWeb.IntakeLive do
                 class="bg-black/15"
                 padding="medium"
               >
-                <div class="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
+                <div>
                   <BoonWeb.Components.InputField.input
                     field={@form[:number]}
                     value={@entry["number"]}
@@ -314,21 +307,12 @@ defmodule BoonWeb.IntakeLive do
                     required
                     autocomplete="off"
                   />
-
-                  <div class="app-panel-soft rounded-[1.25rem] px-4 py-3 text-sm text-stone-300">
-                    One work package can hold one or more purchase orders.
-                  </div>
                 </div>
               </BoonWeb.Components.Card.card>
 
               <div class="space-y-4">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p class="app-kicker text-[0.68rem]">Purchase Orders</p>
-                    <p class="mt-2 text-sm text-stone-400">
-                      Capture each PDF as one purchase order entry.
-                    </p>
-                  </div>
+                  <p class="app-kicker text-[0.68rem]">Purchase Orders</p>
 
                   <BoonWeb.Components.Button.button
                     type="button"
@@ -352,75 +336,24 @@ defmodule BoonWeb.IntakeLive do
                   padding="large"
                 >
                   <BoonWeb.Components.Card.card_content space="large">
-                    <div class="flex items-center justify-between gap-4">
-                      <div>
-                        <p class="app-kicker text-[0.68rem]">Purchase Order {po_index + 1}</p>
-                        <p class="mt-2 text-sm text-stone-400">Header values from the PDF.</p>
-                      </div>
-
-                      <BoonWeb.Components.Button.button
-                        :if={length(@entry["purchase_orders"]) > 1}
+                    <div class="flex flex-wrap items-center justify-between gap-4">
+                      <button
                         type="button"
-                        phx-click="remove_purchase_order"
+                        phx-click="toggle_purchase_order"
                         phx-value-index={po_index}
-                        variant="transparent"
-                        color="danger"
-                        size="small"
+                        class="flex items-center gap-3 text-left"
                       >
-                        Remove PO
-                      </BoonWeb.Components.Button.button>
-                    </div>
-
-                    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-                      <BoonWeb.Components.InputField.input
-                        id={"purchase-orders-#{po_index}-po-number"}
-                        name={purchase_order_input_name(@form.name, po_index, "po_number")}
-                        value={purchase_order["po_number"]}
-                        label="PO number"
-                        required
-                        autocomplete="off"
-                      />
-                      <BoonWeb.Components.InputField.input
-                        id={"purchase-orders-#{po_index}-order-date"}
-                        name={purchase_order_input_name(@form.name, po_index, "order_date")}
-                        value={purchase_order["order_date"]}
-                        label="Order date"
-                        type="date"
-                      />
-                      <BoonWeb.Components.InputField.input
-                        id={"purchase-orders-#{po_index}-revision-date"}
-                        name={purchase_order_input_name(@form.name, po_index, "revision_date")}
-                        value={purchase_order["revision_date"]}
-                        label="Revision date"
-                        type="date"
-                      />
-                      <BoonWeb.Components.InputField.input
-                        id={"purchase-orders-#{po_index}-reference"}
-                        name={purchase_order_input_name(@form.name, po_index, "reference")}
-                        value={purchase_order["reference"]}
-                        label="Reference"
-                      />
-                      <BoonWeb.Components.InputField.input
-                        id={"purchase-orders-#{po_index}-ship-to"}
-                        name={purchase_order_input_name(@form.name, po_index, "ship_to")}
-                        value={purchase_order["ship_to"]}
-                        label="Ship To"
-                        type="select"
-                        options={ShippingLocation.select_options()}
-                        prompt="Select shipping location"
-                        required
-                      />
-                    </div>
-
-                    <div class="space-y-4 rounded-[1.5rem] border border-white/10 bg-black/20 p-5">
-                      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p class="app-kicker text-[0.68rem]">PO Lines</p>
-                          <p class="mt-2 text-sm text-stone-400">
-                            One row for each line item on the purchase order.
-                          </p>
-                        </div>
-
+                        <.icon
+                          name={
+                            if MapSet.member?(@collapsed_purchase_orders, po_index),
+                              do: "hero-chevron-right",
+                              else: "hero-chevron-down"
+                          }
+                          class="h-4 w-4 text-amber-300"
+                        />
+                        <span class="app-kicker text-[0.68rem]">Purchase Order {po_index + 1}</span>
+                      </button>
+                      <div class="flex flex-wrap gap-3">
                         <BoonWeb.Components.Button.button
                           type="button"
                           phx-click="add_line"
@@ -432,6 +365,60 @@ defmodule BoonWeb.IntakeLive do
                         >
                           Add Line
                         </BoonWeb.Components.Button.button>
+                        <BoonWeb.Components.Button.button
+                          :if={length(@entry["purchase_orders"]) > 1}
+                          type="button"
+                          phx-click="remove_purchase_order"
+                          phx-value-index={po_index}
+                          variant="transparent"
+                          color="danger"
+                          size="small"
+                        >
+                          Remove PO
+                        </BoonWeb.Components.Button.button>
+                      </div>
+                    </div>
+
+                    <div :if={!MapSet.member?(@collapsed_purchase_orders, po_index)} class="space-y-4">
+                      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                        <BoonWeb.Components.InputField.input
+                          id={"purchase-orders-#{po_index}-po-number"}
+                          name={purchase_order_input_name(@form.name, po_index, "po_number")}
+                          value={purchase_order["po_number"]}
+                          label="PO number"
+                          required
+                          autocomplete="off"
+                        />
+                        <BoonWeb.Components.InputField.input
+                          id={"purchase-orders-#{po_index}-order-date"}
+                          name={purchase_order_input_name(@form.name, po_index, "order_date")}
+                          value={purchase_order["order_date"]}
+                          label="Order date"
+                          type="date"
+                        />
+                        <BoonWeb.Components.InputField.input
+                          id={"purchase-orders-#{po_index}-revision-date"}
+                          name={purchase_order_input_name(@form.name, po_index, "revision_date")}
+                          value={purchase_order["revision_date"]}
+                          label="Revision date"
+                          type="date"
+                        />
+                        <BoonWeb.Components.InputField.input
+                          id={"purchase-orders-#{po_index}-reference"}
+                          name={purchase_order_input_name(@form.name, po_index, "reference")}
+                          value={purchase_order["reference"]}
+                          label="Reference"
+                        />
+                        <BoonWeb.Components.InputField.input
+                          id={"purchase-orders-#{po_index}-ship-to"}
+                          name={purchase_order_input_name(@form.name, po_index, "ship_to")}
+                          value={purchase_order["ship_to"]}
+                          label="Ship To"
+                          type="select"
+                          options={ShippingLocation.select_options()}
+                          prompt="Select shipping location"
+                          required
+                        />
                       </div>
 
                       <div class="space-y-4">
@@ -440,9 +427,7 @@ defmodule BoonWeb.IntakeLive do
                           id={"purchase-order-#{po_index}-line-#{line_index}"}
                           class="rounded-[1.5rem] border border-white/10 bg-[#0f0909] p-4"
                         >
-                          <div class="mb-4 flex items-center justify-between gap-4">
-                            <p class="text-sm font-semibold text-stone-100">Line {line_index + 1}</p>
-
+                          <div class="mb-4 flex items-center justify-end gap-4">
                             <BoonWeb.Components.Button.button
                               :if={length(purchase_order["lines"]) > 1}
                               type="button"
@@ -534,11 +519,7 @@ defmodule BoonWeb.IntakeLive do
                 class="bg-black/15"
                 padding="medium"
               >
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                  <p class="text-sm text-stone-400">
-                    Save this work package now. Parsing can populate the same fields later.
-                  </p>
-
+                <div class="flex flex-wrap items-center justify-end gap-3">
                   <div class="flex flex-wrap gap-3">
                     <BoonWeb.Components.Button.button_link
                       navigate={~p"/work-packages"}
@@ -561,67 +542,6 @@ defmodule BoonWeb.IntakeLive do
                 </div>
               </BoonWeb.Components.Card.card>
             </.form>
-          </BoonWeb.Components.Card.card_content>
-        </BoonWeb.Components.Card.card>
-
-        <BoonWeb.Components.Card.card
-          variant="bordered"
-          color="warning"
-          rounded="extra_large"
-          class="app-panel-soft"
-          padding="large"
-        >
-          <BoonWeb.Components.Card.card_content space="large">
-            <div class="space-y-3">
-              <p class="app-kicker text-[0.68rem]">Operator Notes</p>
-              <p class="text-sm leading-7 text-stone-200">
-                This first pass is intentionally manual. The point is to prove the workflow shape before the import parser starts inferring values from PDFs.
-              </p>
-            </div>
-
-            <BoonWeb.Components.Card.card
-              variant="bordered"
-              color="warning"
-              rounded="large"
-              class="bg-black/20"
-              padding="medium"
-            >
-              <p class="text-sm uppercase tracking-[0.24em] text-stone-500">Reference Batch</p>
-
-              <p class="mt-3 text-sm text-stone-300">
-                wp10 is available in the repo with {length(@sample_files)} purchase order PDFs and covers the variability we should preserve while refining the intake fields.
-              </p>
-
-              <div class="mt-4 flex flex-wrap gap-2">
-                <BoonWeb.Components.Badge.badge
-                  :for={file <- @sample_files}
-                  color="warning"
-                  variant="outline"
-                  rounded="full"
-                  class="text-xs"
-                >
-                  {file}
-                </BoonWeb.Components.Badge.badge>
-              </div>
-            </BoonWeb.Components.Card.card>
-
-            <BoonWeb.Components.Card.card
-              variant="bordered"
-              color="dark"
-              rounded="large"
-              class="bg-black/20"
-              padding="medium"
-            >
-              <p class="text-sm text-stone-300">
-                Capture the values that already exist in the PDFs now:
-              </p>
-
-              <ul class="mt-3 space-y-2 text-sm text-stone-400">
-                <li>Work package number</li>
-                <li>Purchase order number, dates, and reference</li>
-                <li>Line number, item number, ship date, and quantity</li>
-              </ul>
-            </BoonWeb.Components.Card.card>
           </BoonWeb.Components.Card.card_content>
         </BoonWeb.Components.Card.card>
       </section>
@@ -906,9 +826,19 @@ defmodule BoonWeb.IntakeLive do
     "#{form_name}[purchase_orders][#{po_index}][lines][#{line_index}][#{field_name}]"
   end
 
-  defp sample_files do
-    "c:/Users/jesse/dev/boon/reference/wp10"
-    |> File.ls!()
-    |> Enum.sort()
+  defp reindex_collapsed_purchase_orders(collapsed_purchase_orders, removed_index)
+       when is_binary(removed_index) do
+    reindex_collapsed_purchase_orders(collapsed_purchase_orders, String.to_integer(removed_index))
+  end
+
+  defp reindex_collapsed_purchase_orders(collapsed_purchase_orders, removed_index) do
+    collapsed_purchase_orders
+    |> Enum.reduce(MapSet.new(), fn index, acc ->
+      cond do
+        index < removed_index -> MapSet.put(acc, index)
+        index > removed_index -> MapSet.put(acc, index - 1)
+        true -> acc
+      end
+    end)
   end
 end
