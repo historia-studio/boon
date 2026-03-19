@@ -35,60 +35,71 @@ defmodule BoonWeb.Layouts do
 
   def app(assigns) do
     ~H"""
-    <div class="min-h-screen bg-stone-950 text-stone-100">
-      <header class="border-b border-white/10 bg-stone-950/90 backdrop-blur">
-        <div class="mx-auto flex max-w-7xl items-center justify-between gap-6 px-4 py-4 sm:px-6 lg:px-8">
-          <div>
-            <.link navigate={~p"/"} class="flex items-center gap-3">
-              <div class="flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-400/40 bg-amber-300/10 text-amber-200">
-                <.icon name="hero-cube-transparent" class="h-5 w-5" />
+    <div class="min-h-screen text-stone-100">
+      <header class="sticky top-0 z-30 border-b border-white/10 bg-[#120b0bcc] backdrop-blur-xl">
+        <div class="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+          <div class="flex items-center justify-between gap-4">
+            <.link navigate={~p"/"} class="flex items-center gap-4">
+              <div class="flex h-12 w-12 items-center justify-center rounded-[1.25rem] border border-red-300/20 bg-red-400/10 text-red-200 shadow-[0_12px_30px_rgba(239,68,68,0.18)]">
+                <.icon name="hero-cube-transparent" class="h-6 w-6" />
               </div>
-              
-              <div>
-                <p class="text-xs uppercase tracking-[0.3em] text-stone-400">Boon</p>
-                
-                <p class="text-sm font-semibold text-stone-100">Powdercoating Operations</p>
+
+              <div class="space-y-2">
+                <BoonWeb.Components.Badge.badge
+                  color="warning"
+                  variant="bordered"
+                  rounded="full"
+                  class="w-fit text-[0.65rem] font-medium uppercase tracking-[0.24em]"
+                >
+                  Operator Workflow
+                </BoonWeb.Components.Badge.badge>
+
+                <div>
+                  <p class="text-xs uppercase tracking-[0.28em] text-stone-500">Boon</p>
+                  <p class="text-sm font-semibold text-stone-100">Powdercoating Operations</p>
+                </div>
               </div>
             </.link>
-          </div>
-          
-          <nav class="flex flex-wrap items-center gap-2 text-sm">
-            <.link
-              navigate={~p"/"}
-              class="rounded-full px-4 py-2 text-stone-300 transition hover:bg-white/5 hover:text-white"
-            >
-              Dashboard
-            </.link>
-            <.link
+
+            <BoonWeb.Components.Button.button_link
               navigate={~p"/intake"}
-              class="rounded-full px-4 py-2 text-stone-300 transition hover:bg-white/5 hover:text-white"
+              variant="shadow"
+              color="danger"
+              icon="hero-plus"
+              size="medium"
+              class="lg:hidden"
             >
-              Intake
-            </.link>
-            <.link
-              navigate={~p"/work-packages"}
-              class="rounded-full px-4 py-2 text-stone-300 transition hover:bg-white/5 hover:text-white"
+              New Intake
+            </BoonWeb.Components.Button.button_link>
+          </div>
+
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-center">
+            <nav class="flex flex-wrap items-center gap-2 text-sm">
+              <.link navigate={~p"/"} class="app-nav-link rounded-full px-4 py-2">Dashboard</.link>
+              <.link navigate={~p"/intake"} class="app-nav-link rounded-full px-4 py-2">Intake</.link>
+              <.link navigate={~p"/work-packages"} class="app-nav-link rounded-full px-4 py-2">
+                Work Packages
+              </.link>
+              <.link navigate={~p"/review"} class="app-nav-link rounded-full px-4 py-2">Review</.link>
+              <.link navigate={~p"/ship"} class="app-nav-link rounded-full px-4 py-2">Ship</.link>
+            </nav>
+
+            <BoonWeb.Components.Button.button_link
+              navigate={~p"/intake"}
+              variant="shadow"
+              color="danger"
+              icon="hero-plus"
+              size="medium"
+              class="hidden lg:inline-flex"
             >
-              Work Packages
-            </.link>
-            <.link
-              navigate={~p"/review"}
-              class="rounded-full px-4 py-2 text-stone-300 transition hover:bg-white/5 hover:text-white"
-            >
-              Review
-            </.link>
-            <.link
-              navigate={~p"/ship"}
-              class="rounded-full px-4 py-2 text-stone-300 transition hover:bg-white/5 hover:text-white"
-            >
-              Ship
-            </.link>
-          </nav>
+              New Intake
+            </BoonWeb.Components.Button.button_link>
+          </div>
         </div>
       </header>
-      
+
       <main class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">{render_slot(@inner_block)}</main>
-       <.flash_group flash={@flash} />
+      <.flash_group flash={@flash} />
     </div>
     """
   end
@@ -118,7 +129,7 @@ defmodule BoonWeb.Layouts do
         {gettext("Attempting to reconnect")}
         <.icon name="hero-arrow-path" class="ml-1 size-3 motion-safe:animate-spin" />
       </.flash>
-      
+
       <.flash
         id="server-error"
         kind={:error}

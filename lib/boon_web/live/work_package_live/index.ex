@@ -15,42 +15,84 @@ defmodule BoonWeb.WorkPackageLive.Index do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <section class="space-y-6 rounded-[2rem] border border-white/10 bg-white/5 p-8">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div class="space-y-3">
-            <p class="text-sm uppercase tracking-[0.3em] text-amber-300">Work Packages</p>
+      <BoonWeb.Components.Card.card
+        variant="bordered"
+        color="danger"
+        rounded="extra_large"
+        class="app-panel"
+        padding="large"
+      >
+        <BoonWeb.Components.Card.card_content space="large">
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div class="space-y-3">
+              <BoonWeb.Components.Badge.badge
+                color="warning"
+                variant="bordered"
+                rounded="full"
+                class="w-fit text-[0.68rem] font-medium uppercase tracking-[0.24em]"
+              >
+                Work Packages
+              </BoonWeb.Components.Badge.badge>
 
-            <h1 class="text-3xl font-semibold text-white">Captured intake records</h1>
+              <h1 class="text-3xl font-semibold text-stone-50">Captured intake records</h1>
 
-            <p class="max-w-2xl text-sm leading-7 text-stone-300">
-              Manual intake writes directly into the work package hierarchy. Review and printing can build on the exact same records once those steps are implemented.
-            </p>
+              <p class="max-w-2xl text-sm leading-7 app-copy-muted">
+                Manual intake writes directly into the work package hierarchy. Review and printing can build on the exact same records once those steps are implemented.
+              </p>
+            </div>
+
+            <BoonWeb.Components.Button.button_link
+              navigate={~p"/intake"}
+              variant="shadow"
+              color="danger"
+              icon="hero-plus"
+              size="medium"
+            >
+              Enter Work Package
+            </BoonWeb.Components.Button.button_link>
           </div>
-           <.button navigate={~p"/intake"}>Enter Work Package</.button>
-        </div>
 
-        <div class="overflow-hidden rounded-3xl border border-white/10 bg-stone-900/60">
-          <div class="grid grid-cols-[1.2fr_1fr_1fr_1fr] gap-4 border-b border-white/10 px-6 py-4 text-xs uppercase tracking-[0.25em] text-stone-500">
-            <span>Work Package</span> <span>Purchase Orders</span> <span>PO Lines</span>
-            <span>Entered</span>
-          </div>
-
-          <div :if={@work_packages == []} class="px-6 py-8 text-sm text-stone-400">
+          <div
+            :if={@work_packages == []}
+            class="rounded-[1.5rem] border border-dashed border-white/10 px-6 py-8 text-sm text-stone-400"
+          >
             No work packages have been entered yet.
           </div>
 
-          <.link
-            :for={work_package <- @work_packages}
-            navigate={~p"/work-packages/#{work_package.id}"}
-            class="grid grid-cols-[1.2fr_1fr_1fr_1fr] gap-4 border-b border-white/10 px-6 py-5 text-sm transition hover:bg-white/5"
+          <BoonWeb.Components.Table.table
+            :if={@work_packages != []}
+            id="work-packages-table"
+            rows={@work_packages}
+            row_id={fn work_package -> "work-package-#{work_package.id}" end}
+            variant="base_hoverable"
+            rounded="large"
+            class="text-stone-200"
           >
-            <span class="font-semibold text-white">WP {work_package.number}</span>
-            <span class="text-stone-300">{length(work_package.purchase_orders)}</span>
-            <span class="text-stone-300">{line_count(work_package)}</span>
-            <span class="text-stone-500">{format_datetime(work_package.inserted_at)}</span>
-          </.link>
-        </div>
-      </section>
+            <:col :let={work_package} label="Work Package">
+              <span class="font-semibold text-stone-50">WP {work_package.number}</span>
+            </:col>
+            <:col :let={work_package} label="Purchase Orders">
+              {length(work_package.purchase_orders)}
+            </:col>
+            <:col :let={work_package} label="PO Lines">
+              {line_count(work_package)}
+            </:col>
+            <:col :let={work_package} label="Entered">
+              <span class="text-stone-400">{format_datetime(work_package.inserted_at)}</span>
+            </:col>
+            <:action :let={work_package}>
+              <BoonWeb.Components.Button.button_link
+                navigate={~p"/work-packages/#{work_package.id}"}
+                variant="subtle"
+                color="warning"
+                size="extra_small"
+              >
+                Open
+              </BoonWeb.Components.Button.button_link>
+            </:action>
+          </BoonWeb.Components.Table.table>
+        </BoonWeb.Components.Card.card_content>
+      </BoonWeb.Components.Card.card>
     </Layouts.app>
     """
   end

@@ -19,92 +19,156 @@ defmodule BoonWeb.DashboardLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <section class="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
-        <div class="space-y-6 rounded-[2rem] border border-white/10 bg-white/5 p-8 shadow-2xl shadow-black/20">
-          <div class="space-y-4">
-            <p class="text-sm uppercase tracking-[0.3em] text-amber-300">Data Entry Phase</p>
-
-            <h1 class="max-w-2xl text-4xl font-semibold tracking-tight text-white">
-              Capture work packages by hand now so intake, review, and printing have clean records to build on.
-            </h1>
-
-            <p class="max-w-2xl text-base leading-7 text-stone-300">
-              The current slice lets operators key in a work package with multiple purchase orders and PO lines. PDF parsing can land later against the same workflow once the manual path feels right.
-            </p>
-          </div>
-
-          <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <article
-              :for={card <- @cards}
-              class="rounded-3xl border border-white/10 bg-stone-900/70 p-5"
-            >
-              <p class="text-sm text-stone-400">{card.label}</p>
-
-              <p class="mt-3 text-3xl font-semibold text-white">{card.value}</p>
-
-              <p class="mt-2 text-sm text-stone-500">{card.detail}</p>
-            </article>
-          </div>
-
-          <div class="rounded-3xl border border-white/10 bg-stone-900/70 p-6">
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p class="text-sm uppercase tracking-[0.25em] text-stone-500">Recent Work Packages</p>
-
-                <p class="mt-2 text-sm text-stone-300">
-                  Manual intake entries appear here first and then flow into review and print later.
-                </p>
-              </div>
-               <.button navigate={~p"/intake"}>Enter New Work Package</.button>
-            </div>
-
-            <div
-              :if={@recent_work_packages == []}
-              class="mt-5 rounded-2xl border border-dashed border-white/10 px-4 py-6 text-sm text-stone-400"
-            >
-              No work packages have been entered yet.
-            </div>
-
-            <div :if={@recent_work_packages != []} class="mt-5 grid gap-3">
-              <.link
-                :for={work_package <- @recent_work_packages}
-                navigate={~p"/work-packages/#{work_package.id}"}
-                class="flex items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-4 transition hover:border-amber-400/30 hover:bg-black/30"
+      <section class="grid gap-8 xl:grid-cols-[1.2fr_0.8fr]">
+        <BoonWeb.Components.Card.card
+          variant="gradient"
+          color="danger"
+          rounded="extra_large"
+          class="app-panel"
+          padding="large"
+        >
+          <BoonWeb.Components.Card.card_content space="large">
+            <div class="space-y-5">
+              <BoonWeb.Components.Badge.badge
+                color="warning"
+                variant="bordered"
+                rounded="full"
+                class="w-fit text-[0.68rem] font-medium uppercase tracking-[0.24em]"
               >
-                <div>
-                  <p class="text-sm font-semibold text-white">WP {work_package.number}</p>
+                Data Entry Phase
+              </BoonWeb.Components.Badge.badge>
 
-                  <p class="mt-1 text-sm text-stone-400">
-                    {length(work_package.purchase_orders)} purchase orders, {line_count(work_package)} PO lines
+              <h1 class="max-w-3xl text-4xl font-semibold tracking-tight text-stone-50 sm:text-5xl">
+                Capture work packages by hand now so review, print, and later PDF import all land on the same record shape.
+              </h1>
+
+              <p class="max-w-2xl text-base leading-8 text-red-50/78">
+                The manual path is now the source of truth. Operators can key in one work package with multiple purchase orders and line items, then reuse that structure when the parser comes online.
+              </p>
+
+              <div class="flex flex-wrap gap-3">
+                <BoonWeb.Components.Button.button_link
+                  navigate={~p"/intake"}
+                  variant="shadow"
+                  color="danger"
+                  icon="hero-plus"
+                  size="medium"
+                >
+                  Enter New Work Package
+                </BoonWeb.Components.Button.button_link>
+                <BoonWeb.Components.Button.button_link
+                  navigate={~p"/work-packages"}
+                  variant="outline"
+                  color="warning"
+                  size="medium"
+                >
+                  Browse Records
+                </BoonWeb.Components.Button.button_link>
+              </div>
+            </div>
+
+            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <BoonWeb.Components.Card.card
+                :for={card <- @cards}
+                variant="bordered"
+                color={card.color}
+                rounded="large"
+                class="bg-black/20 backdrop-blur-sm"
+                padding="medium"
+              >
+                <p class="text-sm text-stone-400">{card.label}</p>
+                <p class="mt-3 text-3xl font-semibold text-stone-50">{card.value}</p>
+                <p class="mt-2 text-sm text-stone-500">{card.detail}</p>
+              </BoonWeb.Components.Card.card>
+            </div>
+
+            <BoonWeb.Components.Card.card
+              variant="bordered"
+              color="warning"
+              rounded="large"
+              class="bg-black/20"
+              padding="medium"
+            >
+              <BoonWeb.Components.Card.card_title class="items-start justify-between gap-4">
+                <div>
+                  <p class="app-kicker text-[0.68rem]">Recent Work Packages</p>
+                  <p class="mt-3 text-sm app-copy-muted">
+                    Manual intake entries appear here first and then flow into review and print later.
                   </p>
                 </div>
-                 <.icon name="hero-arrow-right" class="h-5 w-5 text-stone-500" />
-              </.link>
+
+                <BoonWeb.Components.Button.button_link
+                  navigate={~p"/intake"}
+                  variant="subtle"
+                  color="warning"
+                  size="small"
+                >
+                  Open Intake
+                </BoonWeb.Components.Button.button_link>
+              </BoonWeb.Components.Card.card_title>
+
+              <BoonWeb.Components.Card.card_content class="mt-5">
+                <div
+                  :if={@recent_work_packages == []}
+                  class="rounded-[1.25rem] border border-dashed border-white/10 px-4 py-6 text-sm text-stone-400"
+                >
+                  No work packages have been entered yet.
+                </div>
+
+                <div :if={@recent_work_packages != []} class="grid gap-3">
+                  <.link
+                    :for={work_package <- @recent_work_packages}
+                    navigate={~p"/work-packages/#{work_package.id}"}
+                    class="app-panel-soft flex items-center justify-between rounded-[1.25rem] px-4 py-4 transition hover:border-amber-300/20 hover:bg-white/5"
+                  >
+                    <div>
+                      <p class="text-sm font-semibold text-stone-100">WP {work_package.number}</p>
+                      <p class="mt-1 text-sm text-stone-400">
+                        {length(work_package.purchase_orders)} purchase orders, {line_count(
+                          work_package
+                        )} PO lines
+                      </p>
+                    </div>
+                    <.icon name="hero-arrow-right" class="h-5 w-5 text-stone-500" />
+                  </.link>
+                </div>
+              </BoonWeb.Components.Card.card_content>
+            </BoonWeb.Components.Card.card>
+          </BoonWeb.Components.Card.card_content>
+        </BoonWeb.Components.Card.card>
+
+        <BoonWeb.Components.Card.card
+          variant="bordered"
+          color="warning"
+          rounded="extra_large"
+          class="app-panel-soft"
+          padding="large"
+        >
+          <BoonWeb.Components.Card.card_content space="medium">
+            <div class="space-y-3">
+              <p class="app-kicker text-[0.68rem]">Immediate Workflow</p>
+              <p class="text-sm leading-7 text-stone-200">
+                The operator UI is now focused on durable intake data. The next layer is automation, not a different record model.
+              </p>
             </div>
-          </div>
-        </div>
 
-        <aside class="space-y-4 rounded-[2rem] border border-amber-400/20 bg-amber-300/10 p-8">
-          <p class="text-sm uppercase tracking-[0.3em] text-amber-200">Immediate Workflow</p>
+            <ol class="space-y-4 text-sm text-stone-200">
+              <li class="app-panel rounded-[1.25rem] px-4 py-4">
+                1. Enter a work package and its purchase orders by hand.
+              </li>
+              <li class="app-panel rounded-[1.25rem] px-4 py-4">
+                2. Review the captured PO data before print routing exists.
+              </li>
+              <li class="app-panel rounded-[1.25rem] px-4 py-4">
+                3. Reuse the same records when PDF import replaces manual entry.
+              </li>
+            </ol>
 
-          <ol class="space-y-4 text-sm text-stone-200">
-            <li class="rounded-2xl border border-white/10 bg-black/20 p-4">
-              1. Enter a work package and its purchase orders by hand.
-            </li>
-
-            <li class="rounded-2xl border border-white/10 bg-black/20 p-4">
-              2. Review the captured PO data before print routing exists.
-            </li>
-
-            <li class="rounded-2xl border border-white/10 bg-black/20 p-4">
-              3. Reuse the same records when PDF import replaces manual entry.
-            </li>
-          </ol>
-
-          <div class="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-stone-300">
-            The `reference/wp10` PDF set is in the repo as a variability sample for the next parser slice.
-          </div>
-        </aside>
+            <div class="rounded-[1.25rem] border border-red-300/15 bg-red-400/8 px-4 py-4 text-sm text-stone-200">
+              The reference/wp10 PDF set is in the repo as a variability sample for the next parser slice.
+            </div>
+          </BoonWeb.Components.Card.card_content>
+        </BoonWeb.Components.Card.card>
       </section>
     </Layouts.app>
     """
@@ -115,19 +179,27 @@ defmodule BoonWeb.DashboardLive do
       %{
         label: "Work Packages",
         value: counts.work_packages,
-        detail: "Entered into the operator workflow"
+        detail: "Entered into the operator workflow",
+        color: "danger"
       },
       %{
         label: "Purchase Orders",
         value: counts.purchase_orders,
-        detail: "Captured under work packages"
+        detail: "Captured under work packages",
+        color: "warning"
       },
       %{
         label: "PO Lines",
         value: counts.purchase_order_lines,
-        detail: "Ready for review and print"
+        detail: "Ready for review and print",
+        color: "dark"
       },
-      %{label: "Data Entry", value: "Live", detail: "Manual intake is available now"}
+      %{
+        label: "Data Entry",
+        value: "Live",
+        detail: "Manual intake is available now",
+        color: "warning"
+      }
     ]
   end
 
