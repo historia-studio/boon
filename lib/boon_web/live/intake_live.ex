@@ -2,14 +2,14 @@ defmodule BoonWeb.IntakeLive do
   use BoonWeb, :live_view
 
   alias Boon.Operations
-  alias Boon.PDF.IntakeParser
+  alias Boon.PDF.UploadImporter
   alias Boon.ShippingLocation
 
   @impl true
   def mount(_params, _session, socket) do
     {:ok,
      socket
-     |> allow_upload(:purchase_order_pdf, accept: ~w(.pdf), max_entries: 1)
+     |> allow_upload(:purchase_order_pdf, accept: ~w(.pdf .zip), max_entries: 20)
      |> assign(:collapsed_purchase_orders, MapSet.new())
      |> assign(:current_scope, nil)
      |> assign(:entry, empty_entry())
@@ -43,7 +43,7 @@ defmodule BoonWeb.IntakeLive do
       socket.assigns.uploads.purchase_order_pdf.entries == [] ->
         {:noreply,
          socket
-         |> assign(:import_errors, ["Select a PDF before starting import."])
+         |> assign(:import_errors, ["Select one or more PDF or ZIP files before starting import."])
          |> assign(:import_warnings, [])}
 
       upload_errors?(socket.assigns.uploads.purchase_order_pdf) ->
@@ -58,31 +58,31 @@ defmodule BoonWeb.IntakeLive do
       true ->
         result =
           socket
-          |> consume_uploaded_entries(:purchase_order_pdf, fn %{path: path}, _entry ->
-            {:ok, IntakeParser.parse_purchase_order(path)}
+          |> consume_uploaded_entries(:purchase_order_pdf, fn %{path: path}, entry ->
+            {:ok, UploadImporter.import_upload(path, entry.client_name)}
           end)
-          |> List.first()
+          |> merge_import_results()
 
-        case result do
-          {:ok, parsed} ->
+        cond do
+          result.purchase_orders != [] ->
             {:noreply,
              socket
              |> assign(:collapsed_purchase_orders, MapSet.new())
-             |> assign(:entry, import_entry(socket.assigns.entry, parsed))
-             |> assign(:import_errors, [])
-             |> assign(:import_warnings, parsed.warnings)
+             |> assign(:entry, import_entry(socket.assigns.entry, result))
+             |> assign(:import_errors, result.errors)
+             |> assign(:import_warnings, result.warnings)
              |> assign(:save_errors, [])}
 
-          {:error, error} ->
+          result.errors != [] ->
             {:noreply,
              socket
-             |> assign(:import_errors, [error])
+             |> assign(:import_errors, result.errors)
              |> assign(:import_warnings, [])}
 
-          nil ->
+          true ->
             {:noreply,
              socket
-             |> assign(:import_errors, ["The PDF upload did not produce any import data."])
+             |> assign(:import_errors, ["The uploaded files did not produce any import data."])
              |> assign(:import_warnings, [])}
         end
     end
@@ -211,7 +211,7 @@ defmodule BoonWeb.IntakeLive do
               padding="medium"
             >
               <BoonWeb.Components.Card.card_content space="medium">
-                <p class="app-kicker text-[0.68rem]">PDF Import</p>
+                <p class="app-kicker text-[0.68rem]">PDF / ZIP Import</p>
 
                 <.form
                   for={@import_form}
@@ -221,10 +221,40 @@ defmodule BoonWeb.IntakeLive do
                   class="space-y-4"
                 >
                   <div class="space-y-3">
+                    <label
+                      for={@uploads.purchase_order_pdf.ref}
+                      class="block text-sm font-semibold leading-6 text-stone-100"
+                    >
+                      Purchase order files
+                    </label>
+
                     <.live_file_input
                       upload={@uploads.purchase_order_pdf}
                       class="block w-full rounded-[1rem] border border-white/10 bg-[#140d0d] px-4 py-3 text-sm text-stone-200 file:mr-4 file:rounded-full file:border-0 file:bg-red-400/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-red-100"
                     />
+
+                    <div class="rounded-[1rem] border border-white/10 bg-black/20 px-4 py-3">
+                      <p class="text-xs font-semibold uppercase tracking-[0.2em] text-stone-400">
+                        Selected Files
+                      </p>
+
+                      <p
+                        :if={@uploads.purchase_order_pdf.entries == []}
+                        class="mt-2 text-sm text-stone-500"
+                      >
+                        No files selected.
+                      </p>
+
+                      <ul :if={@uploads.purchase_order_pdf.entries != []} class="mt-2 space-y-2">
+                        <li
+                          :for={entry <- @uploads.purchase_order_pdf.entries}
+                          class="flex items-center justify-between gap-3 text-sm text-stone-200"
+                        >
+                          <span class="truncate">{entry.client_name}</span>
+                          <span class="shrink-0 text-xs text-stone-500">{entry.progress}%</span>
+                        </li>
+                      </ul>
+                    </div>
                   </div>
 
                   <div
@@ -263,7 +293,7 @@ defmodule BoonWeb.IntakeLive do
                     size="small"
                     icon="hero-document-arrow-up"
                   >
-                    Parse PDF Into Form
+                    Import Files Into Form
                   </BoonWeb.Components.Button.button>
                 </.form>
               </BoonWeb.Components.Card.card_content>
@@ -380,7 +410,7 @@ defmodule BoonWeb.IntakeLive do
                     </div>
 
                     <div :if={!MapSet.member?(@collapsed_purchase_orders, po_index)} class="space-y-4">
-                      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                         <BoonWeb.Components.InputField.input
                           id={"purchase-orders-#{po_index}-po-number"}
                           name={purchase_order_input_name(@form.name, po_index, "po_number")}
@@ -807,12 +837,22 @@ defmodule BoonWeb.IntakeLive do
     for entry <- upload.entries,
         error <- upload_errors(upload, entry) do
       case error do
-        :too_large -> "The selected PDF is larger than the allowed upload size."
-        :not_accepted -> "Only PDF files are accepted for import."
-        :too_many_files -> "Only one PDF can be imported at a time."
+        :too_large -> "One of the selected files is larger than the allowed upload size."
+        :not_accepted -> "Only PDF and ZIP files are accepted for import."
+        :too_many_files -> "Too many files were selected for one import."
         other -> "Upload failed: #{inspect(other)}"
       end
     end
+  end
+
+  defp merge_import_results(results) do
+    Enum.reduce(results, %{purchase_orders: [], warnings: [], errors: []}, fn result, acc ->
+      %{
+        purchase_orders: acc.purchase_orders ++ result.purchase_orders,
+        warnings: acc.warnings ++ result.warnings,
+        errors: acc.errors ++ result.errors
+      }
+    end)
   end
 
   defp remove_at(list, index) when is_binary(index), do: remove_at(list, String.to_integer(index))

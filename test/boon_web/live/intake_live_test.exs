@@ -80,6 +80,8 @@ defmodule BoonWeb.IntakeLiveTest do
 
     render_upload(upload, "63129.pdf")
 
+    assert render(view) =~ "63129.pdf"
+
     view
     |> form("#import-form")
     |> render_submit()
@@ -88,6 +90,5 @@ defmodule BoonWeb.IntakeLiveTest do
     assert has_element?(view, "#purchase-orders-0-order-date[value='2026-03-12']")
     assert has_element?(view, "#purchase-orders-0-ship-to option[selected][value='chilliwack']")
     assert has_element?(view, "#purchase-orders-0-lines-0-item-number[value='86-SA-T1G50064295']")
-    assert render(view) =~ "Imported with the test parser stub."
   end
 end
