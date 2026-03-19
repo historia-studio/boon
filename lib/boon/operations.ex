@@ -79,6 +79,7 @@ defmodule Boon.Operations do
       order_date: purchase_order_attrs.order_date,
       revision_date: purchase_order_attrs.revision_date,
       reference: purchase_order_attrs.reference,
+      ship_to: purchase_order_attrs.ship_to,
       work_package_id: work_package.id
     }
 

@@ -12,6 +12,11 @@ defmodule Boon.PDF.CamTranTextParserTest do
     Vendor Number : CBOO01
     Currency : CAD
 
+    Vendor: BOON-TEK INDUSTRIES LTD Ship To: CAM TRAN CO LTD.
+    21111-109 AVE 8841 Charles St.
+    EDMONTON, AB, T5S 1X5 Chilliwack, B.C. V2P 7H9
+    CA
+
     Order Date Revision Date Ship Via F.O.B. Currency
     03/12/2026 03/12/2026 CAD
     Responsibility Reference Carrier Account Payment Terms
@@ -32,6 +37,7 @@ defmodule Boon.PDF.CamTranTextParserTest do
     assert purchase_order.order_date == ~D[2026-03-12]
     assert purchase_order.revision_date == ~D[2026-03-12]
     assert purchase_order.reference == "2M017545, ANSI/IEEE GREEN, PUGET N/A"
+    assert purchase_order.ship_to == "chilliwack"
     assert length(purchase_order.lines) == 5
 
     assert Enum.at(purchase_order.lines, 0) == %{

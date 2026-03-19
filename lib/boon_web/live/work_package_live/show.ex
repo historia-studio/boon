@@ -2,6 +2,7 @@ defmodule BoonWeb.WorkPackageLive.Show do
   use BoonWeb, :live_view
 
   alias Boon.Operations
+  alias Boon.ShippingLocation
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -125,6 +126,25 @@ defmodule BoonWeb.WorkPackageLive.Show do
                   <p :if={purchase_order.reference} class="mt-2 text-sm text-stone-400">
                     {purchase_order.reference}
                   </p>
+
+                  <div
+                    :if={purchase_order.ship_to}
+                    class="mt-4 rounded-[1.25rem] border border-white/10 bg-black/20 px-4 py-4"
+                  >
+                    <p class="text-xs uppercase tracking-[0.24em] text-stone-500">Ship To</p>
+                    <p class="mt-2 text-sm font-semibold text-stone-100">
+                      {ShippingLocation.label(purchase_order.ship_to)}
+                    </p>
+                    <p
+                      :for={line <- ShippingLocation.address_lines(purchase_order.ship_to)}
+                      class="text-sm text-stone-400"
+                    >
+                      {line}
+                    </p>
+                    <p class="mt-2 text-xs text-amber-200/85">
+                      Printed paper routes by this shipping location.
+                    </p>
+                  </div>
                 </div>
 
                 <dl class="grid gap-3 sm:grid-cols-3">

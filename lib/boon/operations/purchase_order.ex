@@ -13,12 +13,12 @@ defmodule Boon.Operations.PurchaseOrder do
 
     create :create do
       primary?(true)
-      accept([:po_number, :order_date, :revision_date, :reference, :work_package_id])
+      accept([:po_number, :order_date, :revision_date, :reference, :ship_to, :work_package_id])
     end
 
     update :update do
       primary?(true)
-      accept([:po_number, :order_date, :revision_date, :reference, :work_package_id])
+      accept([:po_number, :order_date, :revision_date, :reference, :ship_to, :work_package_id])
     end
   end
 
@@ -44,6 +44,10 @@ defmodule Boon.Operations.PurchaseOrder do
     end
 
     attribute :reference, :string do
+      public?(true)
+    end
+
+    attribute :ship_to, :string do
       public?(true)
     end
 

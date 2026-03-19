@@ -18,6 +18,7 @@ defmodule Boon.PDF.IntakeParser do
           order_date: Date.t() | nil,
           revision_date: Date.t() | nil,
           reference: String.t() | nil,
+          ship_to: String.t() | nil,
           lines: [line_attrs]
         }
 

@@ -11,6 +11,7 @@ defmodule Boon.PDF.ParserStub do
            order_date: ~D[2026-03-12],
            revision_date: ~D[2026-03-12],
            reference: "2M017545, ANSI/IEEE GREEN, PUGET N/A",
+           ship_to: "chilliwack",
            lines: [
              %{
                line: 1,

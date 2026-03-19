@@ -6,6 +6,8 @@ defmodule Boon.PDF.CamTranTextParser do
 
   @behaviour Boon.PDF.IntakeParser
 
+  alias Boon.ShippingLocation
+
   @line_pattern ~r/^\s*(\d+)\s+(.+?)\s+(\d{2}\/\d{2}\/\d{4})\s+([\d,]+(?:\.\d+)?)\s+(?:[\d,]+(?:\.\d+)?\s+){1,2}[\d,]+(?:\.\d+)?\s*$/
 
   @impl true
@@ -33,9 +35,10 @@ defmodule Boon.PDF.CamTranTextParser do
       {revision_date, revision_date_warning} = extract_optional_revision_date(normalized_text)
 
       {reference, reference_warning} = extract_optional_reference(normalized_text)
+      {ship_to, ship_to_warning} = extract_optional_ship_to(normalized_text)
 
       warnings =
-        [order_date_warning, revision_date_warning, reference_warning]
+        [order_date_warning, revision_date_warning, reference_warning, ship_to_warning]
         |> Enum.reject(&is_nil/1)
 
       {:ok,
@@ -46,6 +49,7 @@ defmodule Boon.PDF.CamTranTextParser do
              order_date: order_date,
              revision_date: revision_date,
              reference: reference,
+             ship_to: ship_to,
              lines: lines
            }
          ],
@@ -98,6 +102,13 @@ defmodule Boon.PDF.CamTranTextParser do
 
       _ ->
         {nil, "Reference was not detected and will need manual review."}
+    end
+  end
+
+  defp extract_optional_ship_to(text) do
+    case ShippingLocation.infer_from_text(text) do
+      nil -> {nil, "Ship To was not detected and will need manual review."}
+      ship_to -> {ship_to, nil}
     end
   end
 

@@ -26,6 +26,7 @@ defmodule BoonWeb.IntakeLiveTest do
           "order_date" => "2026-03-12",
           "revision_date" => "2026-03-12",
           "reference" => "2M017545, ANSI/IEEE GREEN",
+          "ship_to" => "chilliwack",
           "lines" => %{
             "0" => %{
               "line" => "1",
@@ -54,6 +55,7 @@ defmodule BoonWeb.IntakeLiveTest do
     assert saved_work_package.number == "10"
     assert purchase_order.po_number == "63129"
     assert purchase_order.reference == "2M017545, ANSI/IEEE GREEN"
+    assert purchase_order.ship_to == "chilliwack"
     assert line.line == 1
     assert line.item_number == "86-SA-T1G50064295"
     assert line.quantity == 2
@@ -84,6 +86,7 @@ defmodule BoonWeb.IntakeLiveTest do
 
     assert has_element?(view, "#purchase-orders-0-po-number[value='63129']")
     assert has_element?(view, "#purchase-orders-0-order-date[value='2026-03-12']")
+    assert has_element?(view, "#purchase-orders-0-ship-to option[selected][value='chilliwack']")
     assert has_element?(view, "#purchase-orders-0-lines-0-item-number[value='86-SA-T1G50064295']")
     assert render(view) =~ "Imported with the test parser stub."
   end

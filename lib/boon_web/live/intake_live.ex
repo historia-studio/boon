@@ -3,6 +3,7 @@ defmodule BoonWeb.IntakeLive do
 
   alias Boon.Operations
   alias Boon.PDF.IntakeParser
+  alias Boon.ShippingLocation
 
   @impl true
   def mount(_params, _session, socket) do
@@ -370,7 +371,7 @@ defmodule BoonWeb.IntakeLive do
                       </BoonWeb.Components.Button.button>
                     </div>
 
-                    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
                       <BoonWeb.Components.InputField.input
                         id={"purchase-orders-#{po_index}-po-number"}
                         name={purchase_order_input_name(@form.name, po_index, "po_number")}
@@ -398,6 +399,16 @@ defmodule BoonWeb.IntakeLive do
                         name={purchase_order_input_name(@form.name, po_index, "reference")}
                         value={purchase_order["reference"]}
                         label="Reference"
+                      />
+                      <BoonWeb.Components.InputField.input
+                        id={"purchase-orders-#{po_index}-ship-to"}
+                        name={purchase_order_input_name(@form.name, po_index, "ship_to")}
+                        value={purchase_order["ship_to"]}
+                        label="Ship To"
+                        type="select"
+                        options={ShippingLocation.select_options()}
+                        prompt="Select shipping location"
+                        required
                       />
                     </div>
 
@@ -628,6 +639,7 @@ defmodule BoonWeb.IntakeLive do
       "order_date" => "",
       "revision_date" => "",
       "reference" => "",
+      "ship_to" => "",
       "lines" => [empty_line()]
     }
   end
@@ -649,6 +661,7 @@ defmodule BoonWeb.IntakeLive do
             "order_date" => Map.get(purchase_order, "order_date", ""),
             "revision_date" => Map.get(purchase_order, "revision_date", ""),
             "reference" => Map.get(purchase_order, "reference", ""),
+            "ship_to" => Map.get(purchase_order, "ship_to", ""),
             "lines" =>
               purchase_order
               |> Map.get("lines", %{})
@@ -693,13 +706,17 @@ defmodule BoonWeb.IntakeLive do
             line_errors ++
             List.wrap(order_date_error) ++
             List.wrap(revision_date_error) ++
+            validate_ship_to(purchase_order["ship_to"], purchase_order_index) ++
             required_field_error(purchase_order["po_number"], "PO #{purchase_order_index} number")
+
+        normalized_ship_to = normalize_text(purchase_order["ship_to"])
 
         normalized_purchase_order = %{
           po_number: normalize_text(purchase_order["po_number"]),
           order_date: order_date,
           revision_date: revision_date,
           reference: normalize_optional_text(purchase_order["reference"]),
+          ship_to: normalized_ship_to,
           lines: lines
         }
 
@@ -793,6 +810,20 @@ defmodule BoonWeb.IntakeLive do
     if normalize_text(value) == "", do: ["#{label} is required"], else: []
   end
 
+  defp validate_ship_to(value, purchase_order_index) do
+    case normalize_text(value) do
+      "" ->
+        ["PO #{purchase_order_index} ship to is required"]
+
+      ship_to ->
+        if ShippingLocation.valid_value?(ship_to) do
+          []
+        else
+          ["PO #{purchase_order_index} ship to must be one of the supported shipping locations"]
+        end
+    end
+  end
+
   defp normalize_text(value), do: value |> to_string() |> String.trim()
 
   defp normalize_optional_text(value) do
@@ -831,6 +862,7 @@ defmodule BoonWeb.IntakeLive do
       "order_date" => stringify_date(purchase_order.order_date),
       "revision_date" => stringify_date(purchase_order.revision_date),
       "reference" => purchase_order.reference || "",
+      "ship_to" => purchase_order.ship_to || "",
       "lines" => Enum.map(purchase_order.lines, &stringify_line/1)
     }
   end
