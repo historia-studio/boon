@@ -19,7 +19,7 @@ defmodule BoonWeb.DashboardLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <section class="grid gap-8 xl:grid-cols-[1.2fr_0.8fr]">
+      <section class="space-y-8">
         <BoonWeb.Components.Card.card
           variant="gradient"
           color="danger"
@@ -39,11 +39,11 @@ defmodule BoonWeb.DashboardLive do
               </BoonWeb.Components.Badge.badge>
 
               <h1 class="max-w-3xl text-4xl font-semibold tracking-tight text-stone-50 sm:text-5xl">
-                Capture work packages by hand now so review, print, and later PDF import all land on the same record shape.
+                Track work packages, purchase orders, and line items in one clean operations flow.
               </h1>
 
               <p class="max-w-2xl text-base leading-8 text-red-50/78">
-                The manual path is now the source of truth. Operators can key in one work package with multiple purchase orders and line items, then reuse that structure when the parser comes online.
+                Start a work package, attach its purchase orders, and move straight into print and shipping from the same record set.
               </p>
 
               <div class="flex flex-wrap gap-3">
@@ -93,7 +93,7 @@ defmodule BoonWeb.DashboardLive do
                 <div>
                   <p class="app-kicker text-[0.68rem]">Recent Work Packages</p>
                   <p class="mt-3 text-sm app-copy-muted">
-                    Manual intake entries appear here first and then flow into review and print later.
+                    The most recent intake records are ready for review, print, and shipping actions.
                   </p>
                 </div>
 
@@ -134,39 +134,6 @@ defmodule BoonWeb.DashboardLive do
                 </div>
               </BoonWeb.Components.Card.card_content>
             </BoonWeb.Components.Card.card>
-          </BoonWeb.Components.Card.card_content>
-        </BoonWeb.Components.Card.card>
-
-        <BoonWeb.Components.Card.card
-          variant="bordered"
-          color="warning"
-          rounded="extra_large"
-          class="app-panel-soft"
-          padding="large"
-        >
-          <BoonWeb.Components.Card.card_content space="medium">
-            <div class="space-y-3">
-              <p class="app-kicker text-[0.68rem]">Immediate Workflow</p>
-              <p class="text-sm leading-7 text-stone-200">
-                The operator UI is now focused on durable intake data. The next layer is automation, not a different record model.
-              </p>
-            </div>
-
-            <ol class="space-y-4 text-sm text-stone-200">
-              <li class="app-panel rounded-[1.25rem] px-4 py-4">
-                1. Enter a work package and its purchase orders by hand.
-              </li>
-              <li class="app-panel rounded-[1.25rem] px-4 py-4">
-                2. Review the captured PO data before print routing exists.
-              </li>
-              <li class="app-panel rounded-[1.25rem] px-4 py-4">
-                3. Reuse the same records when PDF import replaces manual entry.
-              </li>
-            </ol>
-
-            <div class="rounded-[1.25rem] border border-red-300/15 bg-red-400/8 px-4 py-4 text-sm text-stone-200">
-              The reference/wp10 PDF set is in the repo as a variability sample for the next parser slice.
-            </div>
           </BoonWeb.Components.Card.card_content>
         </BoonWeb.Components.Card.card>
       </section>

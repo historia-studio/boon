@@ -220,42 +220,10 @@ defmodule BoonWeb.IntakeLive do
                   phx-submit="import_pdf"
                   class="space-y-4"
                 >
-                  <div class="space-y-3">
-                    <label
-                      for={@uploads.purchase_order_pdf.ref}
-                      class="block text-sm font-semibold leading-6 text-stone-100"
-                    >
-                      Purchase order files
-                    </label>
-
-                    <.live_file_input
-                      upload={@uploads.purchase_order_pdf}
-                      class="block w-full rounded-[1rem] border border-white/10 bg-[#140d0d] px-4 py-3 text-sm text-stone-200 file:mr-4 file:rounded-full file:border-0 file:bg-red-400/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-red-100"
-                    />
-
-                    <div class="rounded-[1rem] border border-white/10 bg-black/20 px-4 py-3">
-                      <p class="text-xs font-semibold uppercase tracking-[0.2em] text-stone-400">
-                        Selected Files
-                      </p>
-
-                      <p
-                        :if={@uploads.purchase_order_pdf.entries == []}
-                        class="mt-2 text-sm text-stone-500"
-                      >
-                        No files selected.
-                      </p>
-
-                      <ul :if={@uploads.purchase_order_pdf.entries != []} class="mt-2 space-y-2">
-                        <li
-                          :for={entry <- @uploads.purchase_order_pdf.entries}
-                          class="flex items-center justify-between gap-3 text-sm text-stone-200"
-                        >
-                          <span class="truncate">{entry.client_name}</span>
-                          <span class="shrink-0 text-xs text-stone-500">{entry.progress}%</span>
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
+                  <BoonWeb.Components.FileField.file
+                    upload={@uploads.purchase_order_pdf}
+                    label="Purchase order files"
+                  />
 
                   <div
                     :if={@import_errors != []}
@@ -381,7 +349,9 @@ defmodule BoonWeb.IntakeLive do
                           }
                           class="h-4 w-4 text-amber-300"
                         />
-                        <span class="app-kicker text-[0.68rem]">Purchase Order {po_index + 1}</span>
+                        <span class="app-kicker text-[0.68rem]">
+                          {purchase_order_title(purchase_order, po_index)}
+                        </span>
                       </button>
                       <div class="flex flex-wrap gap-3">
                         <BoonWeb.Components.Button.button
@@ -596,6 +566,13 @@ defmodule BoonWeb.IntakeLive do
 
   defp empty_line do
     %{"line" => "", "item_number" => "", "ship_date" => "", "quantity" => ""}
+  end
+
+  defp purchase_order_title(purchase_order, po_index) do
+    case purchase_order |> Map.get("po_number", "") |> String.trim() do
+      "" -> "PO Draft #{po_index + 1}"
+      po_number -> "PO #{po_number}"
+    end
   end
 
   defp normalize_entry(params) do

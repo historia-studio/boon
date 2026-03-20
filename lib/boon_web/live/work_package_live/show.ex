@@ -133,7 +133,7 @@ defmodule BoonWeb.WorkPackageLive.Show do
                 <h1 class="text-4xl font-semibold text-stone-50">WP {@work_package.number}</h1>
 
                 <p class="max-w-2xl text-sm leading-7 text-red-50/76">
-                  This is the current intake shape: one work package with its purchase orders and PO lines ready for review, print, and later PDF-based import.
+                  Review the purchase orders in this work package and launch the required print actions from one screen.
                 </p>
               </div>
 
@@ -236,35 +236,37 @@ defmodule BoonWeb.WorkPackageLive.Show do
                     <div>
                       <p class="app-kicker text-[0.68rem]">Purchase Order</p>
                       <h2 class="mt-3 text-2xl font-semibold text-stone-50">
-                        {purchase_order.po_number}
+                        PO {purchase_order.po_number}
                       </h2>
                     </div>
 
-                    <BoonWeb.Components.Button.button
-                      id={"print-purchase-order-pallet-tags-#{purchase_order.id}"}
-                      type="button"
-                      variant="outline"
-                      color="danger"
-                      icon="hero-document-duplicate"
-                      size="small"
-                      phx-click="print_purchase_order_pallet_tags"
-                      phx-value-purchase-order-id={purchase_order.id}
-                    >
-                      Print PO Pallet Tags
-                    </BoonWeb.Components.Button.button>
+                    <div class="flex flex-wrap gap-3">
+                      <BoonWeb.Components.Button.button
+                        id={"print-purchase-order-pallet-tags-#{purchase_order.id}"}
+                        type="button"
+                        variant="outline"
+                        color="danger"
+                        icon="hero-document-duplicate"
+                        size="small"
+                        phx-click="print_purchase_order_pallet_tags"
+                        phx-value-purchase-order-id={purchase_order.id}
+                      >
+                        Print PO Pallet Tags
+                      </BoonWeb.Components.Button.button>
 
-                    <BoonWeb.Components.Button.button
-                      id={"print-purchase-order-labels-#{purchase_order.id}"}
-                      type="button"
-                      variant="outline"
-                      color="warning"
-                      icon="hero-printer"
-                      size="small"
-                      phx-click="print_purchase_order_labels"
-                      phx-value-purchase-order-id={purchase_order.id}
-                    >
-                      Print PO Labels
-                    </BoonWeb.Components.Button.button>
+                      <BoonWeb.Components.Button.button
+                        id={"print-purchase-order-labels-#{purchase_order.id}"}
+                        type="button"
+                        variant="outline"
+                        color="warning"
+                        icon="hero-printer"
+                        size="small"
+                        phx-click="print_purchase_order_labels"
+                        phx-value-purchase-order-id={purchase_order.id}
+                      >
+                        Print PO Labels
+                      </BoonWeb.Components.Button.button>
+                    </div>
                   </div>
 
                   <p :if={purchase_order.reference} class="mt-2 text-sm text-stone-400">
@@ -334,34 +336,28 @@ defmodule BoonWeb.WorkPackageLive.Show do
                   {line.quantity}
                 </:col>
                 <:action :let={line}>
-                  <BoonWeb.Components.Button.button
+                  <BoonWeb.Components.IconButton.icon_button
                     id={"print-line-pallet-tags-#{line.id}"}
-                    type="button"
                     variant="ghost"
                     color="danger"
                     size="extra_small"
-                    circle
                     icon="hero-document-duplicate"
-                    title="Pallet tags print per purchase order, not per individual line"
-                    aria-label="Pallet tags print per purchase order, not per individual line"
+                    label="Pallet tags print per purchase order, not per individual line"
                     disabled
                     class="cursor-not-allowed opacity-40"
                   />
                 </:action>
                 <:action :let={line}>
-                  <BoonWeb.Components.Button.button
+                  <BoonWeb.Components.IconButton.icon_button
                     id={"print-line-labels-#{line.id}"}
-                    type="button"
                     variant="ghost"
                     color="warning"
                     size="extra_small"
-                    circle
                     icon="hero-printer"
+                    label={line_print_title(line)}
                     phx-click="print_line_labels"
                     phx-value-purchase-order-id={purchase_order.id}
                     phx-value-line-id={line.id}
-                    title={line_print_title(line)}
-                    aria-label={line_print_title(line)}
                     disabled={!ItemNumber.label_item?(line.item_number)}
                     class={
                       if(!ItemNumber.label_item?(line.item_number),
