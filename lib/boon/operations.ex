@@ -114,7 +114,13 @@ defmodule Boon.Operations do
            |> Ash.get!(token_data.work_package_id, load: [purchase_orders: :lines]),
          purchase_order <-
            Enum.find(work_package.purchase_orders, &(&1.id == token_data.purchase_order_id)),
-         {:ok, tag} <- resolve_shipping_tag(work_package, purchase_order, token_data.pair_number) do
+         {:ok, tag} <-
+           resolve_shipping_tag(
+             work_package,
+             purchase_order,
+             token_data.pair_number,
+             token_data.pallet_type
+           ) do
       {:ok, tag}
     else
       nil -> {:error, "The scanned pallet tag does not match an existing purchase order."}
@@ -140,7 +146,7 @@ defmodule Boon.Operations do
     %{
       work_packages: tags |> Enum.map(& &1.work_package_number) |> Enum.uniq(),
       purchase_orders: tags |> Enum.map(& &1.po_number) |> Enum.uniq(),
-      staged_pairs: length(tags)
+      staged_tags: length(tags)
     }
   end
 
@@ -230,6 +236,7 @@ defmodule Boon.Operations do
            %{
              pallet_tag_token: tag.pallet_tag_token,
              pair_number: tag.pair_number,
+             pallet_type: tag.pallet_type,
              po_number: tag.po_number,
              tank_item_number: tag.tank_item_number,
              cabinet_item_number: tag.cabinet_item_number,
@@ -249,6 +256,7 @@ defmodule Boon.Operations do
       attrs = %{
         pallet_tag_token: entry.pallet_tag_token,
         pair_number: entry.pair_number,
+        pallet_type: entry.pallet_type,
         po_number: entry.po_number,
         tank_item_number: entry.tank_item_number,
         cabinet_item_number: entry.cabinet_item_number,
@@ -316,12 +324,13 @@ defmodule Boon.Operations do
     end
   end
 
-  defp resolve_shipping_tag(work_package, purchase_order, pair_number) do
+  defp resolve_shipping_tag(work_package, purchase_order, pair_number, pallet_type) do
     case PalletTagBatch.derive_purchase_order(purchase_order, work_package.number) do
       {:ok, tags} ->
-        case Enum.find(tags, &(&1.pair_number == pair_number)) do
+        case Enum.find(tags, &(&1.pair_number == pair_number and &1.pallet_type == pallet_type)) do
           nil ->
-            {:error, "The scanned pallet tag no longer matches the purchase order pairing."}
+            {:error,
+             "The scanned pallet tag no longer matches the purchase order pallet identity."}
 
           tag ->
             {:ok,
@@ -329,7 +338,12 @@ defmodule Boon.Operations do
                work_package_id: work_package.id,
                purchase_order_id: purchase_order.id,
                pallet_tag_token:
-                 PalletTagToken.sign(work_package.id, purchase_order.id, pair_number)
+                 PalletTagToken.sign(
+                   work_package.id,
+                   purchase_order.id,
+                   pair_number,
+                   pallet_type
+                 )
              })}
         end
 

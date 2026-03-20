@@ -447,7 +447,13 @@ defmodule Boon.Printing.Dispatcher do
       Map.merge(tag, %{
         work_package_id: work_package.id,
         purchase_order_id: purchase_order.id,
-        shipping_url: URL.pallet_tag_url(work_package.id, purchase_order.id, tag.pair_number)
+        shipping_url:
+          URL.pallet_tag_url(
+            work_package.id,
+            purchase_order.id,
+            tag.pair_number,
+            tag.pallet_type
+          )
       })
     end)
   end

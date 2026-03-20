@@ -4,10 +4,11 @@ defmodule Boon.Shipping.PalletTagToken do
   """
 
   @delimiter "."
+  @pallet_types ["tank", "cabinet", "bundle"]
 
-  @spec sign(String.t(), String.t(), pos_integer) :: String.t()
-  def sign(work_package_id, purchase_order_id, pair_number) do
-    payload = payload(work_package_id, purchase_order_id, pair_number)
+  @spec sign(String.t(), String.t(), pos_integer, String.t()) :: String.t()
+  def sign(work_package_id, purchase_order_id, pair_number, pallet_type) do
+    payload = payload(work_package_id, purchase_order_id, pair_number, pallet_type)
     signature = sign_payload(payload)
 
     encode(payload) <> @delimiter <> encode(signature)
@@ -15,7 +16,12 @@ defmodule Boon.Shipping.PalletTagToken do
 
   @spec verify(String.t()) ::
           {:ok,
-           %{work_package_id: String.t(), purchase_order_id: String.t(), pair_number: integer}}
+           %{
+             work_package_id: String.t(),
+             purchase_order_id: String.t(),
+             pair_number: integer,
+             pallet_type: String.t()
+           }}
           | {:error, String.t()}
   def verify(token) when is_binary(token) do
     case String.split(token, @delimiter, parts: 2) do
@@ -39,24 +45,27 @@ defmodule Boon.Shipping.PalletTagToken do
 
   def verify(_token), do: {:error, "The pallet-tag token format is invalid."}
 
-  defp payload(work_package_id, purchase_order_id, pair_number) do
-    Enum.join([work_package_id, purchase_order_id, pair_number], ":")
+  defp payload(work_package_id, purchase_order_id, pair_number, pallet_type) do
+    Enum.join([work_package_id, purchase_order_id, pair_number, pallet_type], ":")
   end
 
   defp parse_payload(payload) do
-    case String.split(payload, ":", parts: 3) do
-      [work_package_id, purchase_order_id, pair_number] ->
-        case Integer.parse(pair_number) do
-          {parsed_pair_number, ""} when parsed_pair_number > 0 ->
-            {:ok,
-             %{
-               work_package_id: work_package_id,
-               purchase_order_id: purchase_order_id,
-               pair_number: parsed_pair_number
-             }}
-
-          _other ->
-            {:error, "The pallet-tag token pair number is invalid."}
+    case String.split(payload, ":", parts: 4) do
+      [work_package_id, purchase_order_id, pair_number, pallet_type] ->
+        with {parsed_pair_number, ""} when parsed_pair_number > 0 <- Integer.parse(pair_number),
+             true <-
+               pallet_type in @pallet_types ||
+                 {:error, "The pallet-tag token pallet type is invalid."} do
+          {:ok,
+           %{
+             work_package_id: work_package_id,
+             purchase_order_id: purchase_order_id,
+             pair_number: parsed_pair_number,
+             pallet_type: pallet_type
+           }}
+        else
+          {:error, _error} = error -> error
+          _other -> {:error, "The pallet-tag token pair number is invalid."}
         end
 
       _other ->

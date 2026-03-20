@@ -91,7 +91,7 @@ defmodule BoonWeb.ShipLive do
 
           <div class="rounded-3xl border border-white/10 bg-stone-900/60 p-5 text-sm text-stone-400">
             <p class="text-xs uppercase tracking-[0.24em] text-stone-500">Draft</p>
-            <p class="mt-3 text-3xl font-semibold text-stone-50">{@shipment_summary.staged_pairs}</p>
+            <p class="mt-3 text-3xl font-semibold text-stone-50">{@shipment_summary.staged_tags}</p>
             <p class="mt-2 text-sm text-stone-300">
               {length(@shipment_summary.purchase_orders)} purchase orders staged across {length(
                 @shipment_summary.work_packages
@@ -132,7 +132,7 @@ defmodule BoonWeb.ShipLive do
             <div>
               <p class="text-xs uppercase tracking-[0.24em] text-stone-500">Staged pallet tags</p>
               <p class="mt-2 text-sm text-stone-300">
-                Only tank and cabinet pallet-tag pairs count toward shipment completion.
+                Each staged pallet tag represents a tank pallet, cabinet pallet, or bundled 1480 pallet.
               </p>
             </div>
           </div>
@@ -152,7 +152,7 @@ defmodule BoonWeb.ShipLive do
             >
               <div>
                 <p class="text-sm font-semibold text-stone-100">
-                  WP {tag.work_package_number} · PO {tag.po_number} · Pair {tag.pair_number}
+                  WP {tag.work_package_number} · PO {tag.po_number} · {pallet_identity_label(tag)}
                 </p>
                 <p class="mt-1 text-sm text-stone-400">
                   Tank {tag.tank_item_number} / Cabinet {tag.cabinet_item_number}
@@ -258,4 +258,13 @@ defmodule BoonWeb.ShipLive do
     Application.get_env(:boon, :shipping, [])
     |> Keyword.get(:host, "DESKTOP-3BBMKIS")
   end
+
+  defp pallet_identity_label(tag) do
+    "#{pallet_type_label(tag.pallet_type)} #{tag.pair_number}"
+  end
+
+  defp pallet_type_label("tank"), do: "Tank"
+  defp pallet_type_label("cabinet"), do: "Cabinet"
+  defp pallet_type_label("bundle"), do: "Bundle"
+  defp pallet_type_label(_other), do: "Pallet"
 end

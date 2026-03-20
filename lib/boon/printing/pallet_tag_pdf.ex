@@ -104,12 +104,21 @@ defmodule Boon.Printing.PalletTagPdf do
       tag.color || "-",
       tag.tank_item_number,
       tag.cabinet_item_number,
-      "#{ship_to} #{tag.pair_number}"
+      pallet_identity_label(tag, ship_to)
     ]
     |> centered_text_block()
     |> Kernel.++([qr_draw_command()])
     |> Enum.join("\n")
   end
+
+  defp pallet_identity_label(tag, ship_to) do
+    "#{ship_to} #{identity_prefix(tag.pallet_type)} #{tag.pair_number}"
+  end
+
+  defp identity_prefix("tank"), do: "TANK"
+  defp identity_prefix("cabinet"), do: "CABINET"
+  defp identity_prefix("bundle"), do: "BUNDLE"
+  defp identity_prefix(_other), do: "PALLET"
 
   defp text_line(x, y, size, text) do
     "BT /F1 #{size} Tf 1 0 0 1 #{x} #{y} Tm (#{escape_text(text)}) Tj ET"

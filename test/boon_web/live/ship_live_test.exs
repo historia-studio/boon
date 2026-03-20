@@ -13,11 +13,12 @@ defmodule BoonWeb.ShipLiveTest do
     work_package = work_package_fixture()
     [purchase_order] = work_package.purchase_orders
 
-    token = PalletTagToken.sign(work_package.id, purchase_order.id, 1)
+    token = PalletTagToken.sign(work_package.id, purchase_order.id, 1, "tank")
 
     {:ok, view, html} = live(conn, ~p"/ship?tag=#{token}")
 
     assert html =~ purchase_order.po_number
+    assert html =~ "Tank 1"
     assert has_element?(view, "#submit-shipment")
 
     view

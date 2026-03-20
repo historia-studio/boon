@@ -46,7 +46,7 @@ defmodule Boon.Printing.PrintingFoundationTest do
   end
 
   describe "pallet tag derivation" do
-    test "pairs tank and cabinet units in quantity order" do
+    test "derives separate tank and cabinet pallet tags for non-1480 references" do
       purchase_order = %{
         po_number: "PO-200",
         reference: "TRANSFORMER, ANSI/IEEE GREEN, PRIORITY",
@@ -58,11 +58,29 @@ defmodule Boon.Printing.PrintingFoundationTest do
       }
 
       assert {:ok, tags} = PalletTagBatch.derive_purchase_order(purchase_order, "WP-200")
-      assert length(tags) == 2
+      assert length(tags) == 4
       assert Enum.all?(tags, &(&1.tank_item_number == "86-SA-T100"))
       assert Enum.all?(tags, &(&1.cabinet_item_number == "86-SA-C100"))
       assert Enum.all?(tags, &(&1.color == "ANSI/IEEE Green"))
+      assert Enum.map(tags, & &1.pair_number) == [1, 1, 2, 2]
+      assert Enum.map(tags, & &1.pallet_type) == ["tank", "cabinet", "tank", "cabinet"]
+    end
+
+    test "keeps bundled pallet tags for 1480 references" do
+      purchase_order = %{
+        po_number: "PO-200",
+        reference: "TRANSFORMER 1480, ANSI/IEEE GREEN, PRIORITY",
+        ship_to: "chilliwack",
+        lines: [
+          %{line: 1, item_number: "86-SA-T100", quantity: 2},
+          %{line: 2, item_number: "86-SA-C100", quantity: 2}
+        ]
+      }
+
+      assert {:ok, tags} = PalletTagBatch.derive_purchase_order(purchase_order, "WP-200")
+      assert length(tags) == 2
       assert Enum.map(tags, & &1.pair_number) == [1, 2]
+      assert Enum.map(tags, & &1.pallet_type) == ["bundle", "bundle"]
     end
 
     test "returns an error when tank and cabinet quantities do not match" do

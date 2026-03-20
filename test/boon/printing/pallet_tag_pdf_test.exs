@@ -15,6 +15,7 @@ defmodule Boon.Printing.PalletTagPdfTest do
           cabinet_item_number: "86-SA-C100",
           ship_to: "chilliwack",
           pair_number: 1,
+          pallet_type: "tank",
           shipping_url: "http://DESKTOP-3BBMKIS:4000/ship?tag=token"
         }
       ])
@@ -32,5 +33,6 @@ defmodule Boon.Printing.PalletTagPdfTest do
     assert pdf =~ "(PO PO-2001)"
     assert pdf =~ "(TRANSFORMER)"
     assert pdf =~ "(GREEN)"
+    assert pdf =~ "(Chilliwack TANK 1)"
   end
 end

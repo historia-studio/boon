@@ -36,24 +36,47 @@ defmodule Boon.Printing.PalletTagBatch do
          "PO #{purchase_order.po_number} has #{length(tanks)} tank units and #{length(cabinets)} cabinet units, so pallet tags cannot be paired deterministically."}
 
       true ->
-        tags =
-          Enum.zip(tanks, cabinets)
-          |> Enum.with_index(1)
-          |> Enum.map(fn {{tank, cabinet}, pair_number} ->
-            %{
-              tank_item_number: tank.item_number,
-              cabinet_item_number: cabinet.item_number,
-              po_reference: purchase_order.reference,
-              color: ReferenceColor.extract(purchase_order.reference),
-              po_number: purchase_order.po_number,
-              work_package_number: work_package_number,
-              ship_to: purchase_order.ship_to,
-              pair_number: pair_number
-            }
-          end)
-
-        {:ok, tags}
+        {:ok,
+         build_tags(
+           purchase_order,
+           work_package_number,
+           Enum.zip(tanks, cabinets)
+         )}
     end
+  end
+
+  defp build_tags(purchase_order, work_package_number, paired_items) do
+    color = ReferenceColor.extract(purchase_order.reference)
+
+    paired_items
+    |> Enum.with_index(1)
+    |> Enum.flat_map(fn {{tank, cabinet}, pair_number} ->
+      base_tag = %{
+        tank_item_number: tank.item_number,
+        cabinet_item_number: cabinet.item_number,
+        po_reference: purchase_order.reference,
+        color: color,
+        po_number: purchase_order.po_number,
+        work_package_number: work_package_number,
+        ship_to: purchase_order.ship_to,
+        pair_number: pair_number
+      }
+
+      if bundled_reference?(purchase_order.reference) do
+        [Map.put(base_tag, :pallet_type, "bundle")]
+      else
+        [
+          Map.put(base_tag, :pallet_type, "tank"),
+          Map.put(base_tag, :pallet_type, "cabinet")
+        ]
+      end
+    end)
+  end
+
+  defp bundled_reference?(reference) do
+    reference
+    |> to_string()
+    |> String.contains?("1480")
   end
 
   defp expanded_items(lines, required_kind) do

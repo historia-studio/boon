@@ -112,7 +112,7 @@ defmodule BoonWeb.WorkPackageShowLiveTest do
 
     assert_receive {:pallet_tag_printed, "Chilliwack", work_package_pdf_path, "%PDF-1.4"}
     assert File.exists?(work_package_pdf_path)
-    assert render(view) =~ "Printed 1 pallet tags to Chilliwack."
+    assert render(view) =~ "Printed 2 pallet tags to Chilliwack."
 
     view
     |> element("#print-purchase-order-pallet-tags-#{purchase_order.id}")

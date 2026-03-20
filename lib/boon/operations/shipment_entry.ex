@@ -17,6 +17,7 @@ defmodule Boon.Operations.ShipmentEntry do
       accept([
         :pallet_tag_token,
         :pair_number,
+        :pallet_type,
         :po_number,
         :tank_item_number,
         :cabinet_item_number,
@@ -28,7 +29,12 @@ defmodule Boon.Operations.ShipmentEntry do
   end
 
   identities do
-    identity(:unique_pair_per_purchase_order, [:purchase_order_id, :pair_number])
+    identity(:unique_typed_pallet_per_purchase_order, [
+      :purchase_order_id,
+      :pair_number,
+      :pallet_type
+    ])
+
     identity(:unique_pallet_tag_token, [:pallet_tag_token])
   end
 
@@ -45,6 +51,12 @@ defmodule Boon.Operations.ShipmentEntry do
       allow_nil?(false)
       public?(true)
       constraints(min: 1)
+    end
+
+    attribute :pallet_type, :string do
+      allow_nil?(false)
+      public?(true)
+      constraints(trim?: true, match: ~r/^(tank|cabinet|bundle)$/)
     end
 
     attribute :po_number, :string do
