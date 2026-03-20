@@ -14,6 +14,7 @@ defmodule Boon.Printing.Dispatcher do
     PalletTagTransport
   }
 
+  alias Boon.Shipping.URL
   alias Boon.ShippingLocation
 
   @label_document_type "labels"
@@ -173,6 +174,8 @@ defmodule Boon.Printing.Dispatcher do
 
     case PalletTagBatch.derive_purchase_order(purchase_order, work_package.number) do
       {:ok, tags} ->
+        tags = enrich_pallet_tags(tags, work_package, purchase_order)
+
         case printer_name do
           nil ->
             create_failed_result(
@@ -439,6 +442,16 @@ defmodule Boon.Printing.Dispatcher do
     }
   end
 
+  defp enrich_pallet_tags(tags, work_package, purchase_order) do
+    Enum.map(tags, fn tag ->
+      Map.merge(tag, %{
+        work_package_id: work_package.id,
+        purchase_order_id: purchase_order.id,
+        shipping_url: URL.pallet_tag_url(work_package.id, purchase_order.id, tag.pair_number)
+      })
+    end)
+  end
+
   defp build_payload_path(opts, parts, extension) when is_list(parts) do
     temp_dir = Keyword.get(opts, :temp_dir, System.tmp_dir!())
     timestamp = System.system_time(:microsecond)
@@ -463,6 +476,15 @@ defmodule Boon.Printing.Dispatcher do
     end
   end
 
-  defp format_error(%_{} = error), do: Exception.message(error)
+  defp format_error(%{__exception__: true} = error), do: Exception.message(error)
+
+  defp format_error(%{errors: errors}) when is_list(errors) do
+    errors
+    |> Enum.map(&format_error/1)
+    |> Enum.reject(&(&1 in [nil, ""]))
+    |> Enum.join("; ")
+  end
+
+  defp format_error(%{error: error}), do: format_error(error)
   defp format_error(error), do: inspect(error)
 end

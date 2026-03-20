@@ -13,12 +13,30 @@ defmodule Boon.Operations.PurchaseOrder do
 
     create :create do
       primary?(true)
-      accept([:po_number, :order_date, :revision_date, :reference, :ship_to, :work_package_id])
+
+      accept([
+        :po_number,
+        :order_date,
+        :revision_date,
+        :reference,
+        :ship_to,
+        :shipped_at,
+        :work_package_id
+      ])
     end
 
     update :update do
       primary?(true)
-      accept([:po_number, :order_date, :revision_date, :reference, :ship_to, :work_package_id])
+
+      accept([
+        :po_number,
+        :order_date,
+        :revision_date,
+        :reference,
+        :ship_to,
+        :shipped_at,
+        :work_package_id
+      ])
     end
   end
 
@@ -51,6 +69,10 @@ defmodule Boon.Operations.PurchaseOrder do
       public?(true)
     end
 
+    attribute :shipped_at, :utc_datetime_usec do
+      public?(true)
+    end
+
     create_timestamp(:inserted_at)
     update_timestamp(:updated_at)
   end
@@ -68,6 +90,11 @@ defmodule Boon.Operations.PurchaseOrder do
     end
 
     has_many :print_jobs, Boon.Operations.PrintJob do
+      public?(true)
+      destination_attribute(:purchase_order_id)
+    end
+
+    has_many :shipment_entries, Boon.Operations.ShipmentEntry do
       public?(true)
       destination_attribute(:purchase_order_id)
     end

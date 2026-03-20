@@ -49,5 +49,15 @@ defmodule Boon.Operations.WorkPackage do
       public?(true)
       destination_attribute(:work_package_id)
     end
+
+    has_many :shipments, Boon.Operations.Shipment do
+      public?(true)
+      destination_attribute(:work_package_id)
+    end
+
+    has_many :shipment_entries, Boon.Operations.ShipmentEntry do
+      public?(true)
+      destination_attribute(:work_package_id)
+    end
   end
 end

@@ -93,7 +93,8 @@ defmodule Boon.Printing.PalletTagPdf do
       text_line(72, 560, 18, "Tank Item Number: #{tag.tank_item_number}"),
       text_line(72, 530, 18, "Cabinet Item Number: #{tag.cabinet_item_number}"),
       text_line(72, 490, 16, "Ship To: #{ship_to}"),
-      text_line(72, 460, 16, "Pallet Pair: #{tag.pair_number}")
+      text_line(72, 460, 16, "Pallet Pair: #{tag.pair_number}"),
+      text_line(72, 430, 10, "Ship URL: #{tag.shipping_url || "-"}")
     ]
     |> Enum.join("\n")
   end
