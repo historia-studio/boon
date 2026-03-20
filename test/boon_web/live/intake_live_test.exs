@@ -91,4 +91,50 @@ defmodule BoonWeb.IntakeLiveTest do
     assert has_element?(view, "#purchase-orders-0-ship-to option[selected][value='chilliwack']")
     assert has_element?(view, "#purchase-orders-0-lines-0-item-number[value='86-SA-T1G50064295']")
   end
+
+  test "operator can save duplicate line numbers within a purchase order", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/intake")
+
+    params = %{
+      "number" => "11",
+      "purchase_orders" => %{
+        "0" => %{
+          "po_number" => "63130",
+          "order_date" => "2026-03-12",
+          "revision_date" => "2026-03-12",
+          "reference" => "2M017549, 1730, RAD, SEA FOAM",
+          "ship_to" => "chilliwack",
+          "lines" => %{
+            "0" => %{
+              "line" => "2",
+              "item_number" => "86-SA-T1C2042000",
+              "ship_date" => "2026-03-26",
+              "quantity" => "3"
+            },
+            "1" => %{
+              "line" => "2",
+              "item_number" => "86-SA-L1A2027900",
+              "ship_date" => "2026-03-26",
+              "quantity" => "2"
+            }
+          }
+        }
+      }
+    }
+
+    render_submit(view, "save", %{"work_package" => params})
+
+    [work_package] = Enum.filter(Operations.list_work_packages(), &(&1.number == "11"))
+
+    assert_redirect(view, ~p"/work-packages/#{work_package.id}")
+
+    saved_work_package = Operations.get_work_package!(work_package.id)
+    [purchase_order] = saved_work_package.purchase_orders
+
+    assert Enum.map(purchase_order.lines, & &1.line) == [2, 2]
+    assert Enum.map(purchase_order.lines, & &1.item_number) == [
+             "86-SA-T1C2042000",
+             "86-SA-L1A2027900"
+           ]
+  end
 end

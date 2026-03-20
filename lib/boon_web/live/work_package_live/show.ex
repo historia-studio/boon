@@ -131,7 +131,6 @@ defmodule BoonWeb.WorkPackageLive.Show do
                 </BoonWeb.Components.Badge.badge>
 
                 <h1 class="text-4xl font-semibold text-stone-50">WP {@work_package.number}</h1>
-
               </div>
 
               <div class="flex flex-wrap gap-3">

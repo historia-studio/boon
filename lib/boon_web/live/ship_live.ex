@@ -102,8 +102,7 @@ defmodule BoonWeb.ShipLive do
               >
                 <p class="app-kicker text-[0.68rem]">Entry</p>
                 <p class="mt-3 text-sm text-stone-300">
-                  Scan a pallet-tag QR code to open this page on
-                  <span class="font-semibold text-stone-100">{shipping_host()}</span>.
+                  Scan a pallet-tag QR code to open this page on <span class="font-semibold text-stone-100">{shipping_host()}</span>.
                 </p>
               </BoonWeb.Components.Card.card>
 
@@ -119,8 +118,9 @@ defmodule BoonWeb.ShipLive do
                   {@shipment_summary.staged_tags}
                 </p>
                 <p class="mt-2 text-sm text-stone-300">
-                  {length(@shipment_summary.purchase_orders)} purchase orders ·
-                  {length(@shipment_summary.work_packages)} work packages
+                  {length(@shipment_summary.purchase_orders)} purchase orders · {length(
+                    @shipment_summary.work_packages
+                  )} work packages
                 </p>
               </BoonWeb.Components.Card.card>
 
@@ -188,8 +188,7 @@ defmodule BoonWeb.ShipLive do
                 >
                   <div>
                     <p class="text-sm font-semibold text-stone-100">
-                      WP {tag.work_package_number} · PO {tag.po_number} ·
-                      {pallet_identity_label(tag)}
+                      WP {tag.work_package_number} · PO {tag.po_number} · {pallet_identity_label(tag)}
                     </p>
                     <p class="mt-1 text-sm text-stone-400">
                       Tank {tag.tank_item_number} / Cabinet {tag.cabinet_item_number}
@@ -213,48 +212,48 @@ defmodule BoonWeb.ShipLive do
             </BoonWeb.Components.Card.card>
 
             <script :type={Phoenix.LiveView.ColocatedHook} name=".ShippingDraft">
-          export default {
-            mounted() {
-              this.storageKey = this.el.dataset.storageKey
-              this.initialTokens = this.parseTokens(this.el.dataset.initialTokens)
-              const storedTokens = this.readDraft()
-              const mergedTokens = [...new Set([...storedTokens, ...this.initialTokens])]
+              export default {
+                mounted() {
+                  this.storageKey = this.el.dataset.storageKey
+                  this.initialTokens = this.parseTokens(this.el.dataset.initialTokens)
+                  const storedTokens = this.readDraft()
+                  const mergedTokens = [...new Set([...storedTokens, ...this.initialTokens])]
 
-              this.writeDraft(mergedTokens)
-              this.pushEvent("hydrate_shipment_draft", {tokens: mergedTokens})
+                  this.writeDraft(mergedTokens)
+                  this.pushEvent("hydrate_shipment_draft", {tokens: mergedTokens})
 
-              this.handleEvent("sync-shipment-draft", ({tokens}) => {
-                this.writeDraft(tokens || [])
-              })
+                  this.handleEvent("sync-shipment-draft", ({tokens}) => {
+                    this.writeDraft(tokens || [])
+                  })
 
-              this.handleEvent("clear-shipment-draft", () => {
-                window.localStorage.removeItem(this.storageKey)
-              })
-            },
+                  this.handleEvent("clear-shipment-draft", () => {
+                    window.localStorage.removeItem(this.storageKey)
+                  })
+                },
 
-            parseTokens(encodedTokens) {
-              try {
-                const parsed = JSON.parse(encodedTokens || "[]")
-                return Array.isArray(parsed) ? parsed.filter(token => typeof token === "string") : []
-              } catch {
-                return []
+                parseTokens(encodedTokens) {
+                  try {
+                    const parsed = JSON.parse(encodedTokens || "[]")
+                    return Array.isArray(parsed) ? parsed.filter(token => typeof token === "string") : []
+                  } catch {
+                    return []
+                  }
+                },
+
+                readDraft() {
+                  try {
+                    const parsed = JSON.parse(window.localStorage.getItem(this.storageKey) || "[]")
+                    return Array.isArray(parsed) ? parsed.filter(token => typeof token === "string") : []
+                  } catch {
+                    return []
+                  }
+                },
+
+                writeDraft(tokens) {
+                  window.localStorage.setItem(this.storageKey, JSON.stringify(tokens))
+                }
               }
-            },
-
-            readDraft() {
-              try {
-                const parsed = JSON.parse(window.localStorage.getItem(this.storageKey) || "[]")
-                return Array.isArray(parsed) ? parsed.filter(token => typeof token === "string") : []
-              } catch {
-                return []
-              }
-            },
-
-            writeDraft(tokens) {
-              window.localStorage.setItem(this.storageKey, JSON.stringify(tokens))
-            }
-          }
-        </script>
+            </script>
           </BoonWeb.Components.Card.card_content>
         </BoonWeb.Components.Card.card>
       </section>

@@ -22,10 +22,6 @@ defmodule Boon.Operations.PurchaseOrderLine do
     end
   end
 
-  identities do
-    identity(:unique_line_per_purchase_order, [:purchase_order_id, :line])
-  end
-
   attributes do
     uuid_primary_key(:id)
 

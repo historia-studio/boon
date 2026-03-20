@@ -152,15 +152,20 @@ defmodule Boon.Operations do
 
   def create_work_package_entry(attrs) do
     Repo.transaction(fn ->
-      with {:ok, work_package} <- Ash.create(WorkPackage, %{number: attrs.number}),
-           {:ok, _purchase_orders} <- create_purchase_orders(work_package, attrs.purchase_orders) do
-        get_work_package!(work_package.id)
+      with {:ok, work_package, work_package_notifications} <-
+             create_resource(WorkPackage, %{number: attrs.number}),
+           {:ok, _purchase_orders, purchase_order_notifications} <-
+             create_purchase_orders(work_package, attrs.purchase_orders) do
+        {get_work_package!(work_package.id), work_package_notifications ++ purchase_order_notifications}
       else
-        {:error, error} -> Repo.rollback(format_error(error))
+        {:error, error} -> Repo.rollback(error)
       end
     end)
     |> case do
-      {:ok, work_package} -> {:ok, work_package}
+      {:ok, {work_package, notifications}} ->
+        notify(notifications)
+        {:ok, work_package}
+
       {:error, errors} when is_list(errors) -> {:error, errors}
       {:error, error} -> {:error, [format_error(error)]}
     end
@@ -168,9 +173,13 @@ defmodule Boon.Operations do
 
   defp create_purchase_orders(work_package, purchase_orders) do
     purchase_orders
-    |> Enum.reduce_while({:ok, []}, fn purchase_order_attrs, {:ok, created_purchase_orders} ->
+    |> Enum.reduce_while({:ok, [], []}, fn purchase_order_attrs,
+                                          {:ok, created_purchase_orders, notifications} ->
       case create_purchase_order(work_package, purchase_order_attrs) do
-        {:ok, purchase_order} -> {:cont, {:ok, [purchase_order | created_purchase_orders]}}
+        {:ok, purchase_order, purchase_order_notifications} ->
+          {:cont,
+           {:ok, [purchase_order | created_purchase_orders], notifications ++ purchase_order_notifications}}
+
         {:error, error} -> {:halt, {:error, error}}
       end
     end)
@@ -186,15 +195,16 @@ defmodule Boon.Operations do
       work_package_id: work_package.id
     }
 
-    with {:ok, purchase_order} <- Ash.create(PurchaseOrder, attrs),
-         {:ok, _lines} <- create_purchase_order_lines(purchase_order, purchase_order_attrs.lines) do
-      {:ok, purchase_order}
+    with {:ok, purchase_order, purchase_order_notifications} <- create_resource(PurchaseOrder, attrs),
+         {:ok, _lines, line_notifications} <-
+           create_purchase_order_lines(purchase_order, purchase_order_attrs.lines) do
+      {:ok, purchase_order, purchase_order_notifications ++ line_notifications}
     end
   end
 
   defp create_purchase_order_lines(purchase_order, lines) do
     lines
-    |> Enum.reduce_while({:ok, []}, fn line_attrs, {:ok, created_lines} ->
+    |> Enum.reduce_while({:ok, [], []}, fn line_attrs, {:ok, created_lines, notifications} ->
       attrs = %{
         line: line_attrs.line,
         item_number: line_attrs.item_number,
@@ -203,8 +213,10 @@ defmodule Boon.Operations do
         purchase_order_id: purchase_order.id
       }
 
-      case Ash.create(PurchaseOrderLine, attrs) do
-        {:ok, line} -> {:cont, {:ok, [line | created_lines]}}
+      case create_resource(PurchaseOrderLine, attrs) do
+        {:ok, line, line_notifications} ->
+          {:cont, {:ok, [line | created_lines], notifications ++ line_notifications}}
+
         {:error, error} -> {:halt, {:error, error}}
       end
     end)
@@ -352,15 +364,33 @@ defmodule Boon.Operations do
     end
   end
 
+  defp create_resource(resource, attrs) do
+    case Ash.create(resource, attrs, return_notifications?: true) do
+      {:ok, record, notifications} -> {:ok, record, notifications}
+      {:ok, record} -> {:ok, record, []}
+      {:error, error} -> {:error, error}
+    end
+  end
+
+  defp notify([]), do: :ok
+
+  defp notify(notifications) when is_list(notifications) do
+    Ash.Notifier.notify(notifications)
+  end
+
   defp format_error(%{__exception__: true} = error), do: Exception.message(error)
 
   defp format_error(%{errors: errors}) when is_list(errors) do
-    errors
-    |> Enum.map(&format_error/1)
-    |> Enum.reject(&(&1 in [nil, ""]))
-    |> Enum.join("; ")
+    case errors
+         |> Enum.map(&format_error/1)
+         |> Enum.reject(&(&1 in [nil, ""]))
+         |> Enum.join("; ") do
+      "" -> inspect(errors)
+      formatted -> formatted
+    end
   end
 
+  defp format_error([]), do: "Unknown error."
   defp format_error(%{error: error}), do: format_error(error)
   defp format_error(error), do: inspect(error)
 end

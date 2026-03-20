@@ -90,7 +90,9 @@ defmodule BoonWeb.IntakeLive do
 
   @impl true
   def handle_event("add_purchase_order", _params, socket) do
-    entry = update_in(socket.assigns.entry["purchase_orders"], &(&1 ++ [empty_purchase_order()]))
+    entry =
+      update_in(socket.assigns.entry["purchase_orders"], &(&1 ++ [empty_purchase_order()]))
+      |> then(&put_in(socket.assigns.entry["purchase_orders"], &1))
 
     {:noreply,
      socket
@@ -122,12 +124,12 @@ defmodule BoonWeb.IntakeLive do
   def handle_event("add_line", %{"po-index" => po_index}, socket) do
     po_index = String.to_integer(po_index)
 
-    entry =
-      update_in(socket.assigns.entry["purchase_orders"], fn purchase_orders ->
-        List.update_at(purchase_orders, po_index, fn purchase_order ->
-          update_in(purchase_order["lines"], &(&1 ++ [empty_line()]))
-        end)
+    purchase_orders =
+      List.update_at(socket.assigns.entry["purchase_orders"], po_index, fn purchase_order ->
+        update_in(purchase_order["lines"], &(&1 ++ [empty_line()]))
       end)
+
+    entry = put_in(socket.assigns.entry["purchase_orders"], purchase_orders)
 
     {:noreply, assign(socket, :entry, entry)}
   end
@@ -225,35 +227,6 @@ defmodule BoonWeb.IntakeLive do
                     label="Purchase order files"
                   />
 
-                  <div
-                    :if={@import_errors != []}
-                    class="rounded-[1rem] border border-rose-300/30 bg-rose-400/10 px-4 py-3 text-sm text-rose-100"
-                  >
-                    <ul class="space-y-1">
-                      <li :for={error <- @import_errors}>{error}</li>
-                    </ul>
-                  </div>
-
-                  <div
-                    :if={@import_warnings != []}
-                    class="rounded-[1rem] border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100"
-                  >
-                    <ul class="space-y-1">
-                      <li :for={warning <- @import_warnings}>{warning}</li>
-                    </ul>
-                  </div>
-
-                  <div
-                    :if={upload_errors?(@uploads.purchase_order_pdf)}
-                    class="rounded-[1rem] border border-rose-300/30 bg-rose-400/10 px-4 py-3 text-sm text-rose-100"
-                  >
-                    <ul class="space-y-1">
-                      <li :for={error <- upload_error_messages(@uploads.purchase_order_pdf)}>
-                        {error}
-                      </li>
-                    </ul>
-                  </div>
-
                   <BoonWeb.Components.Button.button
                     type="submit"
                     variant="shadow"
@@ -299,7 +272,7 @@ defmodule BoonWeb.IntakeLive do
                 <div>
                   <BoonWeb.Components.InputField.input
                     field={@form[:number]}
-                    value={@entry["number"]}
+                    value={Map.get(@entry, "number", "")}
                     label="Work package number"
                     placeholder="10"
                     required
@@ -325,7 +298,7 @@ defmodule BoonWeb.IntakeLive do
                 </div>
 
                 <BoonWeb.Components.Card.card
-                  :for={{purchase_order, po_index} <- Enum.with_index(@entry["purchase_orders"])}
+                  :for={{purchase_order, po_index} <- Enum.with_index(Map.get(@entry, "purchase_orders", []))}
                   id={"purchase-order-#{po_index}"}
                   variant="bordered"
                   color="warning"
@@ -366,7 +339,7 @@ defmodule BoonWeb.IntakeLive do
                           Add Line
                         </BoonWeb.Components.Button.button>
                         <BoonWeb.Components.Button.button
-                          :if={length(@entry["purchase_orders"]) > 1}
+                          :if={length(Map.get(@entry, "purchase_orders", [])) > 1}
                           type="button"
                           phx-click="remove_purchase_order"
                           phx-value-index={po_index}
@@ -510,6 +483,37 @@ defmodule BoonWeb.IntakeLive do
                     </div>
                   </BoonWeb.Components.Card.card_content>
                 </BoonWeb.Components.Card.card>
+              </div>
+
+              <div class="space-y-3">
+                <div
+                  :if={@import_errors != []}
+                  class="rounded-[1rem] border border-rose-300/30 bg-rose-400/10 px-4 py-3 text-sm text-rose-100"
+                >
+                  <ul class="space-y-1">
+                    <li :for={error <- @import_errors}>{error}</li>
+                  </ul>
+                </div>
+
+                <div
+                  :if={@import_warnings != []}
+                  class="rounded-[1rem] border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100"
+                >
+                  <ul class="space-y-1">
+                    <li :for={warning <- @import_warnings}>{warning}</li>
+                  </ul>
+                </div>
+
+                <div
+                  :if={upload_errors?(@uploads.purchase_order_pdf)}
+                  class="rounded-[1rem] border border-rose-300/30 bg-rose-400/10 px-4 py-3 text-sm text-rose-100"
+                >
+                  <ul class="space-y-1">
+                    <li :for={error <- upload_error_messages(@uploads.purchase_order_pdf)}>
+                      {error}
+                    </li>
+                  </ul>
+                </div>
               </div>
 
               <BoonWeb.Components.Card.card
@@ -664,9 +668,10 @@ defmodule BoonWeb.IntakeLive do
   end
 
   defp validate_lines(lines, purchase_order_index) do
-    lines
-    |> Enum.with_index(1)
-    |> Enum.reduce({[], []}, fn {line, line_index}, {normalized_lines, errors} ->
+    {normalized_lines, errors} =
+      lines
+      |> Enum.with_index(1)
+      |> Enum.reduce({[], []}, fn {line, line_index}, {normalized_lines, errors} ->
       {line_number, line_number_error} =
         parse_positive_integer(
           line["line"],
@@ -704,7 +709,10 @@ defmodule BoonWeb.IntakeLive do
 
       {[normalized_line | normalized_lines], line_errors}
     end)
-    |> then(fn {normalized_lines, errors} -> {Enum.reverse(normalized_lines), errors} end)
+
+    normalized_lines = Enum.reverse(normalized_lines)
+
+    {normalized_lines, errors}
   end
 
   defp parse_positive_integer(value, label) do

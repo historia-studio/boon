@@ -35,7 +35,6 @@ defmodule BoonWeb.WorkPackageLive.Index do
               </BoonWeb.Components.Badge.badge>
 
               <h1 class="text-3xl font-semibold text-stone-50">Captured intake records</h1>
-
             </div>
 
             <BoonWeb.Components.Button.button_link
