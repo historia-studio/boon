@@ -15,7 +15,7 @@ config :boon,
   printing: [
     sumatra_path: "C:/ProgramData/SumatraPDF/sumatrapdf.exe",
     label_printer_endpoints: %{
-      "Label Maker" => %{host: nil, port: 9100}
+      "Label Maker" => %{mode: :windows_raw_queue}
     }
   ],
   pdf_tool_paths: %{
