@@ -21,7 +21,6 @@ defmodule BoonWeb.Router do
     live "/intake", IntakeLive
     live "/work-packages", WorkPackageLive.Index
     live "/work-packages/:id", WorkPackageLive.Show
-    live "/review", ReviewLive
     live "/ship", ShipLive
   end
 

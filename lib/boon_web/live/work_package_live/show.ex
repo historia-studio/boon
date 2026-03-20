@@ -331,21 +331,6 @@ defmodule BoonWeb.WorkPackageLive.Show do
                 </:col>
                 <:action :let={line}>
                   <BoonWeb.Components.Button.button
-                    id={"print-line-pallet-tags-#{line.id}"}
-                    type="button"
-                    variant="ghost"
-                    color="danger"
-                    size="extra_small"
-                    icon="hero-document-duplicate"
-                    circle
-                    title="Pallet tags print per purchase order, not per individual line"
-                    aria-label="Pallet tags print per purchase order, not per individual line"
-                    disabled
-                    class="cursor-not-allowed opacity-40"
-                  />
-                </:action>
-                <:action :let={line}>
-                  <BoonWeb.Components.Button.button
                     id={"print-line-labels-#{line.id}"}
                     type="button"
                     variant="ghost"

@@ -151,7 +151,7 @@ defmodule BoonWeb.DashboardLive do
       %{
         label: "PO Lines",
         value: counts.purchase_order_lines,
-        detail: "Ready for review and print",
+        detail: "Reviewed in intake and ready for print",
         color: "dark"
       }
     ]
