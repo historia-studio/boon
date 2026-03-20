@@ -12,6 +12,12 @@ config :boon,
   ash_domains: [Boon.Operations],
   generators: [timestamp_type: :utc_datetime],
   pdf_intake_parser: Boon.PDF.HostParser,
+  printing: [
+    sumatra_path: "C:/ProgramData/SumatraPDF/sumatrapdf.exe",
+    label_printer_endpoints: %{
+      "Label Maker" => %{host: nil, port: 9100}
+    }
+  ],
   pdf_tool_paths: %{
     pdftoppm: "C:/ProgramData/poppler-25.12.0/Library/bin/pdftoppm.exe",
     pdftotext: "C:/ProgramData/poppler-25.12.0/Library/bin/pdftotext.exe",

@@ -70,6 +70,19 @@ defmodule Boon.ShippingLocation do
   def label_printer(value) when is_binary(value), do: get_in(@locations, [value, :label_printer])
   def label_printer(_value), do: nil
 
+  @spec shared_label_printer() :: String.t() | nil
+  def shared_label_printer do
+    @locations
+    |> Map.values()
+    |> Enum.map(& &1.label_printer)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
+    |> case do
+      [printer] -> printer
+      _ -> nil
+    end
+  end
+
   @spec infer_from_text(String.t()) :: value | nil
   def infer_from_text(text) when is_binary(text) do
     cond do
