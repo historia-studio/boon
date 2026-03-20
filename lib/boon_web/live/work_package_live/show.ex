@@ -132,9 +132,6 @@ defmodule BoonWeb.WorkPackageLive.Show do
 
                 <h1 class="text-4xl font-semibold text-stone-50">WP {@work_package.number}</h1>
 
-                <p class="max-w-2xl text-sm leading-7 text-red-50/76">
-                  Review the purchase orders in this work package and launch the required print actions from one screen.
-                </p>
               </div>
 
               <div class="flex flex-wrap gap-3">
@@ -287,9 +284,6 @@ defmodule BoonWeb.WorkPackageLive.Show do
                     >
                       {line}
                     </p>
-                    <p class="mt-2 text-xs text-amber-200/85">
-                      Printed paper routes by this shipping location.
-                    </p>
                   </div>
                 </div>
 
@@ -336,25 +330,31 @@ defmodule BoonWeb.WorkPackageLive.Show do
                   {line.quantity}
                 </:col>
                 <:action :let={line}>
-                  <BoonWeb.Components.IconButton.icon_button
+                  <BoonWeb.Components.Button.button
                     id={"print-line-pallet-tags-#{line.id}"}
+                    type="button"
                     variant="ghost"
                     color="danger"
                     size="extra_small"
                     icon="hero-document-duplicate"
-                    label="Pallet tags print per purchase order, not per individual line"
+                    circle
+                    title="Pallet tags print per purchase order, not per individual line"
+                    aria-label="Pallet tags print per purchase order, not per individual line"
                     disabled
                     class="cursor-not-allowed opacity-40"
                   />
                 </:action>
                 <:action :let={line}>
-                  <BoonWeb.Components.IconButton.icon_button
+                  <BoonWeb.Components.Button.button
                     id={"print-line-labels-#{line.id}"}
+                    type="button"
                     variant="ghost"
                     color="warning"
                     size="extra_small"
                     icon="hero-printer"
-                    label={line_print_title(line)}
+                    circle
+                    title={line_print_title(line)}
+                    aria-label={line_print_title(line)}
                     phx-click="print_line_labels"
                     phx-value-purchase-order-id={purchase_order.id}
                     phx-value-line-id={line.id}

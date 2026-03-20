@@ -39,12 +39,8 @@ defmodule BoonWeb.DashboardLive do
               </BoonWeb.Components.Badge.badge>
 
               <h1 class="max-w-3xl text-4xl font-semibold tracking-tight text-stone-50 sm:text-5xl">
-                Track work packages, purchase orders, and line items in one clean operations flow.
+                Work packages, purchase orders, and print — one flow.
               </h1>
-
-              <p class="max-w-2xl text-base leading-8 text-red-50/78">
-                Start a work package, attach its purchase orders, and move straight into print and shipping from the same record set.
-              </p>
 
               <div class="flex flex-wrap gap-3">
                 <BoonWeb.Components.Button.button_link
@@ -67,7 +63,7 @@ defmodule BoonWeb.DashboardLive do
               </div>
             </div>
 
-            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div class="grid gap-4 sm:grid-cols-3">
               <BoonWeb.Components.Card.card
                 :for={card <- @cards}
                 variant="bordered"
@@ -92,9 +88,6 @@ defmodule BoonWeb.DashboardLive do
               <BoonWeb.Components.Card.card_title class="items-start justify-between gap-4">
                 <div>
                   <p class="app-kicker text-[0.68rem]">Recent Work Packages</p>
-                  <p class="mt-3 text-sm app-copy-muted">
-                    The most recent intake records are ready for review, print, and shipping actions.
-                  </p>
                 </div>
 
                 <BoonWeb.Components.Button.button_link
@@ -160,12 +153,6 @@ defmodule BoonWeb.DashboardLive do
         value: counts.purchase_order_lines,
         detail: "Ready for review and print",
         color: "dark"
-      },
-      %{
-        label: "Data Entry",
-        value: "Live",
-        detail: "Manual intake is available now",
-        color: "warning"
       }
     ]
   end

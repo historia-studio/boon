@@ -63,119 +63,156 @@ defmodule BoonWeb.ShipLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <section class="space-y-6 rounded-[2rem] border border-white/10 bg-white/5 p-8">
-        <div
-          id="shipping-draft-hook"
-          phx-hook=".ShippingDraft"
-          data-storage-key={@draft_storage_key}
-          data-initial-tokens={Jason.encode!(@staged_tokens)}
-        />
-
-        <div class="space-y-3">
-          <p class="text-sm uppercase tracking-[0.3em] text-amber-300">Ship</p>
-
-          <h1 class="text-3xl font-semibold text-white">Mobile-first scan and ship workflow</h1>
-
-          <p class="max-w-2xl text-sm leading-7 text-stone-300">
-            Scan a pallet-tag QR directly into this route or keep this screen open and stage scans into the local draft. Draft shipment state stays in the browser until you confirm it.
-          </p>
-        </div>
-
-        <div class="grid gap-4 md:grid-cols-3">
-          <div class="rounded-3xl border border-white/10 bg-stone-900/60 p-5 text-sm text-stone-400">
-            <p class="text-xs uppercase tracking-[0.24em] text-stone-500">Entry</p>
-            <p class="mt-3 text-sm leading-7 text-stone-300">
-              Use the pallet-tag QR to open this page on <span class="font-semibold text-stone-100">{shipping_host()}</span>. In-page camera scanning can be added on top of the same local draft model next.
-            </p>
-          </div>
-
-          <div class="rounded-3xl border border-white/10 bg-stone-900/60 p-5 text-sm text-stone-400">
-            <p class="text-xs uppercase tracking-[0.24em] text-stone-500">Draft</p>
-            <p class="mt-3 text-3xl font-semibold text-stone-50">{@shipment_summary.staged_tags}</p>
-            <p class="mt-2 text-sm text-stone-300">
-              {length(@shipment_summary.purchase_orders)} purchase orders staged across {length(
-                @shipment_summary.work_packages
-              )} work packages.
-            </p>
-          </div>
-
-          <div class="rounded-3xl border border-white/10 bg-stone-900/60 p-5 text-sm text-stone-400">
-            <p class="text-xs uppercase tracking-[0.24em] text-stone-500">Submit</p>
-            <BoonWeb.Components.Button.button
-              id="submit-shipment"
-              type="button"
-              variant="shadow"
-              color="danger"
-              icon="hero-truck"
-              size="medium"
-              phx-click="submit_shipment"
-              disabled={@staged_tags == []}
-              class={if(@staged_tags == [], do: "cursor-not-allowed opacity-40")}
-            >
-              Confirm Shipment
-            </BoonWeb.Components.Button.button>
-            <p class="mt-3 text-sm leading-7 text-stone-300">
-              Confirmation persists a shipment record and clears the browser draft.
-            </p>
-          </div>
-        </div>
-
-        <div :if={@draft_errors != []} class="rounded-3xl border border-red-400/30 bg-red-950/40 p-5">
-          <p class="text-xs uppercase tracking-[0.24em] text-red-200">Draft errors</p>
-          <ul class="mt-3 space-y-2 text-sm text-red-100">
-            <li :for={error <- @draft_errors}>{error}</li>
-          </ul>
-        </div>
-
-        <div class="rounded-3xl border border-white/10 bg-stone-900/60 p-5">
-          <div class="flex items-center justify-between gap-4">
-            <div>
-              <p class="text-xs uppercase tracking-[0.24em] text-stone-500">Staged pallet tags</p>
-              <p class="mt-2 text-sm text-stone-300">
-                Each staged pallet tag represents a tank pallet, cabinet pallet, or bundled 1480 pallet.
-              </p>
-            </div>
-          </div>
-
-          <div class="mt-4 space-y-3">
+      <section>
+        <BoonWeb.Components.Card.card
+          variant="gradient"
+          color="danger"
+          rounded="extra_large"
+          class="app-panel"
+          padding="large"
+        >
+          <BoonWeb.Components.Card.card_content space="large">
             <div
-              :if={@staged_tags == []}
-              class="rounded-2xl border border-dashed border-white/10 p-5 text-sm text-stone-500"
-            >
-              No pallet tags are staged yet. Scan a QR or open this page with a `tag` query parameter.
-            </div>
+              id="shipping-draft-hook"
+              phx-hook=".ShippingDraft"
+              data-storage-key={@draft_storage_key}
+              data-initial-tokens={Jason.encode!(@staged_tokens)}
+            />
 
-            <div
-              :for={tag <- @staged_tags}
-              id={"staged-tag-#{tag.pallet_tag_token}"}
-              class="flex flex-col gap-3 rounded-[1.25rem] border border-white/10 bg-black/20 px-4 py-4 md:flex-row md:items-center md:justify-between"
-            >
-              <div>
-                <p class="text-sm font-semibold text-stone-100">
-                  WP {tag.work_package_number} · PO {tag.po_number} · {pallet_identity_label(tag)}
-                </p>
-                <p class="mt-1 text-sm text-stone-400">
-                  Tank {tag.tank_item_number} / Cabinet {tag.cabinet_item_number}
-                </p>
-              </div>
-
-              <BoonWeb.Components.Button.button
-                id={"remove-staged-tag-#{tag.pallet_tag_token}"}
-                type="button"
-                variant="ghost"
+            <div class="space-y-3">
+              <BoonWeb.Components.Badge.badge
                 color="warning"
-                size="small"
-                icon="hero-x-mark"
-                phx-click="remove_staged_tag"
-                phx-value-token={tag.pallet_tag_token}
+                variant="bordered"
+                rounded="full"
+                class="w-fit text-[0.68rem] font-medium uppercase tracking-[0.24em]"
               >
-                Remove
-              </BoonWeb.Components.Button.button>
-            </div>
-          </div>
-        </div>
+                Ship
+              </BoonWeb.Components.Badge.badge>
 
-        <script :type={Phoenix.LiveView.ColocatedHook} name=".ShippingDraft">
+              <h1 class="text-3xl font-semibold text-stone-50">Scan and ship</h1>
+            </div>
+
+            <div class="grid gap-4 md:grid-cols-3">
+              <BoonWeb.Components.Card.card
+                variant="bordered"
+                color="warning"
+                rounded="large"
+                class="bg-black/15"
+                padding="medium"
+              >
+                <p class="app-kicker text-[0.68rem]">Entry</p>
+                <p class="mt-3 text-sm text-stone-300">
+                  Scan a pallet-tag QR code to open this page on
+                  <span class="font-semibold text-stone-100">{shipping_host()}</span>.
+                </p>
+              </BoonWeb.Components.Card.card>
+
+              <BoonWeb.Components.Card.card
+                variant="bordered"
+                color="warning"
+                rounded="large"
+                class="bg-black/15"
+                padding="medium"
+              >
+                <p class="app-kicker text-[0.68rem]">Draft</p>
+                <p class="mt-3 text-3xl font-semibold text-stone-50">
+                  {@shipment_summary.staged_tags}
+                </p>
+                <p class="mt-2 text-sm text-stone-300">
+                  {length(@shipment_summary.purchase_orders)} purchase orders ·
+                  {length(@shipment_summary.work_packages)} work packages
+                </p>
+              </BoonWeb.Components.Card.card>
+
+              <BoonWeb.Components.Card.card
+                variant="bordered"
+                color="danger"
+                rounded="large"
+                class="bg-black/15"
+                padding="medium"
+              >
+                <p class="app-kicker text-[0.68rem]">Submit</p>
+                <div class="mt-3">
+                  <BoonWeb.Components.Button.button
+                    id="submit-shipment"
+                    type="button"
+                    variant="shadow"
+                    color="danger"
+                    icon="hero-truck"
+                    size="medium"
+                    phx-click="submit_shipment"
+                    disabled={@staged_tags == []}
+                    class={if(@staged_tags == [], do: "cursor-not-allowed opacity-40")}
+                  >
+                    Confirm Shipment
+                  </BoonWeb.Components.Button.button>
+                </div>
+              </BoonWeb.Components.Card.card>
+            </div>
+
+            <BoonWeb.Components.Card.card
+              :if={@draft_errors != []}
+              variant="bordered"
+              color="danger"
+              rounded="large"
+              class="bg-black/15"
+              padding="medium"
+            >
+              <p class="app-kicker text-[0.68rem]">Errors</p>
+              <ul class="mt-3 space-y-2 text-sm text-rose-100">
+                <li :for={error <- @draft_errors}>{error}</li>
+              </ul>
+            </BoonWeb.Components.Card.card>
+
+            <BoonWeb.Components.Card.card
+              variant="bordered"
+              color="warning"
+              rounded="large"
+              class="bg-black/15"
+              padding="medium"
+            >
+              <p class="app-kicker text-[0.68rem]">Staged Pallet Tags</p>
+
+              <div class="mt-4 space-y-3">
+                <div
+                  :if={@staged_tags == []}
+                  class="rounded-[1.5rem] border border-dashed border-white/10 px-4 py-6 text-sm text-stone-400"
+                >
+                  No pallet tags staged. Scan a QR or open this page with a tag query parameter.
+                </div>
+
+                <div
+                  :for={tag <- @staged_tags}
+                  id={"staged-tag-#{tag.pallet_tag_token}"}
+                  class="app-panel-soft flex flex-col gap-3 rounded-[1.25rem] px-4 py-4 md:flex-row md:items-center md:justify-between"
+                >
+                  <div>
+                    <p class="text-sm font-semibold text-stone-100">
+                      WP {tag.work_package_number} · PO {tag.po_number} ·
+                      {pallet_identity_label(tag)}
+                    </p>
+                    <p class="mt-1 text-sm text-stone-400">
+                      Tank {tag.tank_item_number} / Cabinet {tag.cabinet_item_number}
+                    </p>
+                  </div>
+
+                  <BoonWeb.Components.Button.button
+                    id={"remove-staged-tag-#{tag.pallet_tag_token}"}
+                    type="button"
+                    variant="ghost"
+                    color="warning"
+                    size="small"
+                    icon="hero-x-mark"
+                    phx-click="remove_staged_tag"
+                    phx-value-token={tag.pallet_tag_token}
+                  >
+                    Remove
+                  </BoonWeb.Components.Button.button>
+                </div>
+              </div>
+            </BoonWeb.Components.Card.card>
+
+            <script :type={Phoenix.LiveView.ColocatedHook} name=".ShippingDraft">
           export default {
             mounted() {
               this.storageKey = this.el.dataset.storageKey
@@ -218,6 +255,8 @@ defmodule BoonWeb.ShipLive do
             }
           }
         </script>
+          </BoonWeb.Components.Card.card_content>
+        </BoonWeb.Components.Card.card>
       </section>
     </Layouts.app>
     """

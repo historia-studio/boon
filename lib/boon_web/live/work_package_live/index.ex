@@ -36,9 +36,6 @@ defmodule BoonWeb.WorkPackageLive.Index do
 
               <h1 class="text-3xl font-semibold text-stone-50">Captured intake records</h1>
 
-              <p class="max-w-2xl text-sm leading-7 app-copy-muted">
-                Manual intake writes directly into the work package hierarchy. Review and printing can build on the exact same records once those steps are implemented.
-              </p>
             </div>
 
             <BoonWeb.Components.Button.button_link
