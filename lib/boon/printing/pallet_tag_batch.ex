@@ -4,6 +4,7 @@ defmodule Boon.Printing.PalletTagBatch do
   """
 
   alias Boon.Printing.ItemNumber
+  alias Boon.Printing.PurchaseOrderReference
   alias Boon.Printing.ReferenceColor
 
   @spec derive_work_package(map) :: {:ok, [map]} | {:error, [String.t()]}
@@ -74,9 +75,7 @@ defmodule Boon.Printing.PalletTagBatch do
   end
 
   defp bundled_reference?(reference) do
-    reference
-    |> to_string()
-    |> String.contains?("1480")
+    PurchaseOrderReference.bundled?(reference)
   end
 
   defp expanded_items(lines, required_kind) do
