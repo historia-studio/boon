@@ -2,6 +2,7 @@ defmodule BoonWeb.WorkPackageLive.Show do
   use BoonWeb, :live_view
 
   alias Boon.Operations
+  alias Boon.Printing.{Dispatcher, ItemNumber, LabelTransport}
   alias Boon.ShippingLocation
 
   @impl true
@@ -12,6 +13,64 @@ defmodule BoonWeb.WorkPackageLive.Show do
      socket
      |> assign(:current_scope, nil)
      |> assign(:work_package, work_package)}
+  end
+
+  @impl true
+  def handle_event("print_work_package_labels", _params, socket) do
+    {:noreply,
+     socket
+     |> print_labels(
+       Dispatcher.dispatch_work_package_labels(
+         socket.assigns.work_package,
+         label_dispatch_options()
+       )
+     )}
+  end
+
+  def handle_event(
+        "print_purchase_order_labels",
+        %{"purchase-order-id" => purchase_order_id},
+        socket
+      ) do
+    case find_purchase_order(socket.assigns.work_package, purchase_order_id) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "That purchase order could not be found.")}
+
+      purchase_order ->
+        {:noreply,
+         socket
+         |> print_labels(
+           Dispatcher.dispatch_purchase_order_labels(
+             socket.assigns.work_package,
+             purchase_order,
+             label_dispatch_options()
+           )
+         )}
+    end
+  end
+
+  def handle_event(
+        "print_line_labels",
+        %{"purchase-order-id" => purchase_order_id, "line-id" => line_id},
+        socket
+      ) do
+    with purchase_order when not is_nil(purchase_order) <-
+           find_purchase_order(socket.assigns.work_package, purchase_order_id),
+         line when not is_nil(line) <- find_line(purchase_order, line_id) do
+      {:noreply,
+       socket
+       |> print_labels(
+         Dispatcher.dispatch_purchase_order_line_labels(
+           socket.assigns.work_package,
+           purchase_order,
+           line,
+           label_dispatch_options()
+         )
+       )}
+    else
+      _missing ->
+        {:noreply, put_flash(socket, :error, "That PO line could not be found.")}
+    end
   end
 
   @impl true
@@ -46,6 +105,17 @@ defmodule BoonWeb.WorkPackageLive.Show do
               </div>
 
               <div class="flex flex-wrap gap-3">
+                <BoonWeb.Components.Button.button
+                  id="print-work-package-labels"
+                  type="button"
+                  variant="shadow"
+                  color="warning"
+                  icon="hero-printer"
+                  size="medium"
+                  phx-click="print_work_package_labels"
+                >
+                  Print All Labels
+                </BoonWeb.Components.Button.button>
                 <BoonWeb.Components.Button.button_link
                   navigate={~p"/intake"}
                   variant="shadow"
@@ -118,10 +188,27 @@ defmodule BoonWeb.WorkPackageLive.Show do
             <BoonWeb.Components.Card.card_content space="large">
               <div class="grid gap-4 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
                 <div>
-                  <p class="app-kicker text-[0.68rem]">Purchase Order</p>
-                  <h2 class="mt-3 text-2xl font-semibold text-stone-50">
-                    {purchase_order.po_number}
-                  </h2>
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p class="app-kicker text-[0.68rem]">Purchase Order</p>
+                      <h2 class="mt-3 text-2xl font-semibold text-stone-50">
+                        {purchase_order.po_number}
+                      </h2>
+                    </div>
+
+                    <BoonWeb.Components.Button.button
+                      id={"print-purchase-order-labels-#{purchase_order.id}"}
+                      type="button"
+                      variant="outline"
+                      color="warning"
+                      icon="hero-printer"
+                      size="small"
+                      phx-click="print_purchase_order_labels"
+                      phx-value-purchase-order-id={purchase_order.id}
+                    >
+                      Print PO Labels
+                    </BoonWeb.Components.Button.button>
+                  </div>
 
                   <p :if={purchase_order.reference} class="mt-2 text-sm text-stone-400">
                     {purchase_order.reference}
@@ -189,6 +276,28 @@ defmodule BoonWeb.WorkPackageLive.Show do
                 <:col :let={line} label="Quantity">
                   {line.quantity}
                 </:col>
+                <:action :let={line}>
+                  <BoonWeb.Components.Button.button
+                    id={"print-line-labels-#{line.id}"}
+                    type="button"
+                    variant="ghost"
+                    color="warning"
+                    size="extra_small"
+                    circle
+                    icon="hero-printer"
+                    phx-click="print_line_labels"
+                    phx-value-purchase-order-id={purchase_order.id}
+                    phx-value-line-id={line.id}
+                    title={line_print_title(line)}
+                    aria-label={line_print_title(line)}
+                    disabled={!ItemNumber.label_item?(line.item_number)}
+                    class={
+                      if(!ItemNumber.label_item?(line.item_number),
+                        do: "cursor-not-allowed opacity-40"
+                      )
+                    }
+                  />
+                </:action>
               </BoonWeb.Components.Table.table>
             </BoonWeb.Components.Card.card_content>
           </BoonWeb.Components.Card.card>
@@ -202,6 +311,48 @@ defmodule BoonWeb.WorkPackageLive.Show do
     Enum.reduce(work_package.purchase_orders, 0, fn purchase_order, total ->
       total + length(purchase_order.lines)
     end)
+  end
+
+  defp print_labels(socket, {:ok, result}) do
+    case result.status do
+      :completed ->
+        put_flash(
+          socket,
+          :info,
+          "Printed #{result.label_count} labels to #{result.target_printer}."
+        )
+
+      :skipped ->
+        put_flash(socket, :error, result.error || "No labels were available to print.")
+
+      :failed ->
+        put_flash(socket, :error, result.error || "Label printing failed.")
+    end
+  end
+
+  defp find_purchase_order(work_package, purchase_order_id) do
+    Enum.find(work_package.purchase_orders, &(&1.id == purchase_order_id))
+  end
+
+  defp find_line(purchase_order, line_id) do
+    Enum.find(purchase_order.lines, &(&1.id == line_id))
+  end
+
+  defp label_dispatch_options do
+    printing_config = Application.get_env(:boon, :printing, [])
+
+    [
+      label_transport: Keyword.get(printing_config, :label_transport_module, LabelTransport),
+      label_transport_opts: Keyword.get(printing_config, :label_transport_opts, [])
+    ]
+  end
+
+  defp line_print_title(line) do
+    if ItemNumber.label_item?(line.item_number) do
+      "Print labels for line #{line.line}"
+    else
+      "Labels are not printed for this line"
+    end
   end
 
   defp format_date(%Date{} = date), do: Calendar.strftime(date, "%Y-%m-%d")

@@ -46,49 +46,108 @@ defmodule Boon.Printing.Dispatcher do
      }}
   end
 
-  defp dispatch_labels(work_package, opts) do
+  @spec dispatch_work_package_labels(map, keyword) :: {:ok, map}
+  def dispatch_work_package_labels(work_package, opts \\ []) do
     labels = LabelBatch.derive_work_package(work_package)
 
+    {:ok,
+     dispatch_label_batch(
+       labels,
+       resolve_label_printer(work_package),
+       work_package.id,
+       nil,
+       ["labels", work_package.number],
+       "Work package #{work_package.number} does not contain any label-eligible lines.",
+       opts
+     )}
+  end
+
+  @spec dispatch_purchase_order_labels(map, map, keyword) :: {:ok, map}
+  def dispatch_purchase_order_labels(work_package, purchase_order, opts \\ []) do
+    labels = LabelBatch.derive_purchase_order(purchase_order, work_package.number)
+
+    {:ok,
+     dispatch_label_batch(
+       labels,
+       ShippingLocation.label_printer(purchase_order.ship_to) ||
+         resolve_label_printer(work_package),
+       work_package.id,
+       purchase_order.id,
+       ["labels", work_package.number, purchase_order.po_number],
+       "PO #{purchase_order.po_number} does not contain any label-eligible lines.",
+       opts
+     )}
+  end
+
+  @spec dispatch_purchase_order_line_labels(map, map, map, keyword) :: {:ok, map}
+  def dispatch_purchase_order_line_labels(work_package, purchase_order, line, opts \\ []) do
+    labels = LabelBatch.derive_purchase_order_line(line, purchase_order, work_package.number)
+
+    {:ok,
+     dispatch_label_batch(
+       labels,
+       ShippingLocation.label_printer(purchase_order.ship_to) ||
+         resolve_label_printer(work_package),
+       work_package.id,
+       purchase_order.id,
+       ["labels", work_package.number, purchase_order.po_number, line.line],
+       "PO #{purchase_order.po_number} line #{line.line} does not require printed labels.",
+       opts
+     )}
+  end
+
+  defp dispatch_labels(work_package, opts) do
+    {:ok, result} = dispatch_work_package_labels(work_package, opts)
+    result
+  end
+
+  defp dispatch_label_batch(
+         labels,
+         printer_name,
+         work_package_id,
+         purchase_order_id,
+         payload_parts,
+         empty_message,
+         opts
+       ) do
     if labels == [] do
       %{
         document_type: @label_document_type,
         status: :skipped,
-        target_printer: ShippingLocation.shared_label_printer(),
-        error: nil,
+        target_printer: printer_name,
+        error: empty_message,
         payload_path: nil,
-        print_job: nil
+        print_job: nil,
+        label_count: 0
       }
     else
-      printer = resolve_label_printer(work_package)
-
-      case printer do
+      case printer_name do
         nil ->
           create_failed_result(
             @label_document_type,
             nil,
-            work_package.id,
+            work_package_id,
+            purchase_order_id,
             nil,
-            nil,
-            "No shared label printer is configured for this work package."
+            "No label printer is configured for this scope.",
+            length(labels)
           )
 
-        printer_name ->
+        resolved_printer_name ->
           zpl = LabelZpl.render_batch(labels)
-
-          payload_path =
-            build_payload_path(opts, "labels", work_package.number, ".zpl")
-
+          payload_path = build_payload_path(opts, payload_parts, ".zpl")
           transport = Keyword.get(opts, :label_transport, LabelTransport)
           transport_opts = Keyword.get(opts, :label_transport_opts, [])
 
           run_print_job(
             @label_document_type,
-            printer_name,
-            work_package.id,
-            nil,
+            resolved_printer_name,
+            work_package_id,
+            purchase_order_id,
             payload_path,
             fn -> File.write(payload_path, zpl) end,
-            fn -> transport.print(printer_name, zpl, transport_opts) end
+            fn -> transport.print(resolved_printer_name, zpl, transport_opts) end,
+            length(labels)
           )
       end
     end
@@ -112,7 +171,7 @@ defmodule Boon.Printing.Dispatcher do
 
           printer ->
             payload_path =
-              build_payload_path(opts, purchase_order.po_number, work_package.number, ".pdf")
+              build_payload_path(opts, [purchase_order.po_number, work_package.number], ".pdf")
 
             transport = Keyword.get(opts, :pallet_tag_transport, PalletTagTransport)
             transport_opts = Keyword.get(opts, :pallet_tag_transport_opts, [])
@@ -124,7 +183,8 @@ defmodule Boon.Printing.Dispatcher do
               purchase_order.id,
               payload_path,
               fn -> PalletTagPdf.write(tags, payload_path) end,
-              fn -> transport.print(printer, payload_path, transport_opts) end
+              fn -> transport.print(printer, payload_path, transport_opts) end,
+              length(tags)
             )
         end
 
@@ -147,7 +207,8 @@ defmodule Boon.Printing.Dispatcher do
          purchase_order_id,
          payload_path,
          write_fun,
-         print_fun
+         print_fun,
+         item_count
        ) do
     case Operations.create_print_job(%{
            document_type: document_type,
@@ -170,7 +231,8 @@ defmodule Boon.Printing.Dispatcher do
                       target_printer: printer_name,
                       error: nil,
                       payload_path: payload_path,
-                      print_job: completed_job
+                      print_job: completed_job,
+                      label_count: item_count
                     }
 
                   {:error, error} ->
@@ -179,12 +241,20 @@ defmodule Boon.Printing.Dispatcher do
                       document_type,
                       printer_name,
                       payload_path,
-                      format_error(error)
+                      format_error(error),
+                      item_count
                     )
                 end
 
               {:error, error} when is_binary(error) ->
-                failed_result(print_job, document_type, printer_name, payload_path, error)
+                failed_result(
+                  print_job,
+                  document_type,
+                  printer_name,
+                  payload_path,
+                  error,
+                  item_count
+                )
 
               {:error, error} ->
                 failed_result(
@@ -192,12 +262,13 @@ defmodule Boon.Printing.Dispatcher do
                   document_type,
                   printer_name,
                   payload_path,
-                  format_error(error)
+                  format_error(error),
+                  item_count
                 )
             end
 
           {:error, error} when is_binary(error) ->
-            failed_result(print_job, document_type, printer_name, payload_path, error)
+            failed_result(print_job, document_type, printer_name, payload_path, error, item_count)
 
           {:error, error} ->
             failed_result(
@@ -205,7 +276,8 @@ defmodule Boon.Printing.Dispatcher do
               document_type,
               printer_name,
               payload_path,
-              format_error(error)
+              format_error(error),
+              item_count
             )
         end
 
@@ -216,7 +288,8 @@ defmodule Boon.Printing.Dispatcher do
           work_package_id,
           purchase_order_id,
           payload_path,
-          error
+          error,
+          item_count
         )
 
       {:error, error} ->
@@ -226,7 +299,8 @@ defmodule Boon.Printing.Dispatcher do
           work_package_id,
           purchase_order_id,
           payload_path,
-          format_error(error)
+          format_error(error),
+          item_count
         )
     end
   end
@@ -237,7 +311,8 @@ defmodule Boon.Printing.Dispatcher do
          work_package_id,
          purchase_order_id,
          payload_path,
-         error
+         error,
+         item_count \\ nil
        ) do
     result = %{
       document_type: document_type,
@@ -245,7 +320,8 @@ defmodule Boon.Printing.Dispatcher do
       target_printer: printer_name,
       error: error,
       payload_path: payload_path,
-      print_job: nil
+      print_job: nil,
+      label_count: item_count
     }
 
     case Operations.create_print_job(%{
@@ -268,7 +344,7 @@ defmodule Boon.Printing.Dispatcher do
     |> Ash.update()
   end
 
-  defp failed_result(print_job, document_type, printer_name, payload_path, error) do
+  defp failed_result(print_job, document_type, printer_name, payload_path, error, item_count) do
     case update_print_job(print_job, %{status: "failed", error_details: error}) do
       {:ok, failed_job} ->
         %{
@@ -277,7 +353,8 @@ defmodule Boon.Printing.Dispatcher do
           target_printer: printer_name,
           error: error,
           payload_path: payload_path,
-          print_job: failed_job
+          print_job: failed_job,
+          label_count: item_count
         }
 
       {:error, _update_error} ->
@@ -287,7 +364,8 @@ defmodule Boon.Printing.Dispatcher do
           target_printer: printer_name,
           error: error,
           payload_path: payload_path,
-          print_job: print_job
+          print_job: print_job,
+          label_count: item_count
         }
     end
   end
@@ -301,13 +379,14 @@ defmodule Boon.Printing.Dispatcher do
     end
   end
 
-  defp build_payload_path(opts, prefix, suffix, extension) do
+  defp build_payload_path(opts, parts, extension) when is_list(parts) do
     temp_dir = Keyword.get(opts, :temp_dir, System.tmp_dir!())
     timestamp = System.system_time(:microsecond)
 
     filename =
-      sanitize_filename(prefix) <>
-        "-" <> sanitize_filename(suffix) <> "-" <> Integer.to_string(timestamp) <> extension
+      (parts
+       |> Enum.map(&sanitize_filename/1)
+       |> Enum.join("-")) <> "-" <> Integer.to_string(timestamp) <> extension
 
     Path.join(temp_dir, filename)
   end

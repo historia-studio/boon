@@ -15,25 +15,30 @@ defmodule Boon.Printing.LabelBatch do
   def derive_purchase_order(purchase_order, work_package_number) do
     purchase_order.lines
     |> Enum.flat_map(fn line ->
-      kind = ItemNumber.kind(line.item_number)
-
-      if ItemNumber.label_kind?(kind) do
-        Enum.map(1..line.quantity, fn copy_number ->
-          %{
-            item_number: line.item_number,
-            item_kind: kind,
-            item_label: ItemNumber.legend(kind),
-            po_number: purchase_order.po_number,
-            work_package_number: work_package_number,
-            purchase_order_id: Map.get(purchase_order, :id),
-            purchase_order_line_id: Map.get(line, :id),
-            line_number: line.line,
-            copy_number: copy_number
-          }
-        end)
-      else
-        []
-      end
+      derive_purchase_order_line(line, purchase_order, work_package_number)
     end)
+  end
+
+  @spec derive_purchase_order_line(map, map, String.t()) :: [map]
+  def derive_purchase_order_line(line, purchase_order, work_package_number) do
+    kind = ItemNumber.kind(line.item_number)
+
+    if ItemNumber.label_kind?(kind) do
+      Enum.map(1..line.quantity, fn copy_number ->
+        %{
+          item_number: line.item_number,
+          item_kind: kind,
+          item_label: ItemNumber.legend(kind),
+          po_number: purchase_order.po_number,
+          work_package_number: work_package_number,
+          purchase_order_id: Map.get(purchase_order, :id),
+          purchase_order_line_id: Map.get(line, :id),
+          line_number: line.line,
+          copy_number: copy_number
+        }
+      end)
+    else
+      []
+    end
   end
 end
