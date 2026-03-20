@@ -50,7 +50,7 @@ defmodule Boon.PDF.CamTranTextParserTest do
     assert warnings == []
   end
 
-  test "prefers the lower repeated reference when the header reference is overlapped" do
+  test "prefers the lower repeated wrapped reference and stops before the footer disclaimer" do
     text = """
     Purchase Order
     Purchase Order Number : 63130
@@ -75,14 +75,20 @@ defmodule Boon.PDF.CamTranTextParserTest do
     3 86-SA-L1C2022100 03/19/2026 1.00 195.00 195.00
     4 RAD 03/19/2026 3.00 100.00 300.00
 
-    2M017553, 1730, 3 RAD, SEA FOAM
+    2M017553, 1730, 3 RAD, SEA FOAM,
+    84-1024300
+
+    Shipping and Receiving hours are 7:00 a.m. to 3:00 p.m., Monday to Friday.
+    PLEASE CONFIRM PURCHASE ORDER.
+    APPROVED FOR PURCHASE
+    Supplier accepts all responsibility for the information provided on the commercial or customs invoice.
     """
 
     assert {:ok, %{purchase_orders: [purchase_order], warnings: warnings}} =
              CamTranTextParser.parse(text)
 
     assert purchase_order.po_number == "63130"
-    assert purchase_order.reference == "2M017553, 1730, 3 RAD, SEA FOAM"
+    assert purchase_order.reference == "2M017553, 1730, 3 RAD, SEA FOAM, 84-1024300"
     assert purchase_order.ship_to == "chilliwack"
     assert length(purchase_order.lines) == 4
     assert warnings == []

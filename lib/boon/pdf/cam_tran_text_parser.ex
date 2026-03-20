@@ -9,6 +9,15 @@ defmodule Boon.PDF.CamTranTextParser do
   alias Boon.ShippingLocation
 
   @line_pattern ~r/^\s*(\d+)\s+(.+?)\s+(\d{2}\/\d{2}\/\d{4})\s+([\d,]+(?:\.\d+)?)\s+(?:[\d,]+(?:\.\d+)?\s+){1,2}[\d,]+(?:\.\d+)?\s*$/
+  @footer_boundary_markers [
+    "Shipping and Receiving hours",
+    "PLEASE CONFIRM PURCHASE ORDER",
+    "Supplier accepts all responsibility",
+    "APPROVED FOR PURCHASE",
+    "Total Order Value",
+    "Buyer Signature",
+    "Authorized:"
+  ]
 
   @impl true
   def parse_purchase_order(path) do
@@ -130,7 +139,8 @@ defmodule Boon.PDF.CamTranTextParser do
       index ->
         lines
         |> Enum.drop(index + 1)
-        |> Enum.find(&reference_footer_line?/1)
+        |> Enum.take_while(&(not footer_boundary_line?(&1)))
+        |> footer_reference_block()
     end
   end
 
@@ -158,11 +168,39 @@ defmodule Boon.PDF.CamTranTextParser do
     end)
   end
 
-  defp reference_footer_line?(line) do
+  defp footer_reference_block(lines) do
+    case Enum.find_index(lines, &reference_footer_start_line?/1) do
+      nil ->
+        nil
+
+      start_index ->
+        lines
+        |> Enum.drop(start_index)
+        |> Enum.take_while(&reference_footer_continuation_line?/1)
+        |> Enum.join(" ")
+        |> case do
+          "" -> nil
+          reference -> reference
+        end
+    end
+  end
+
+  defp reference_footer_start_line?(line) do
     String.contains?(line, ",") and
-      Regex.match?(~r/^[A-Z0-9][A-Z0-9\-\/ ]*(?:,\s*[^,\n]+)+$/i, line) and
+      Regex.match?(~r/^[A-Z0-9][A-Z0-9\-\/, ]*$/i, line) and
       not Regex.match?(@line_pattern, line) and
       not String.contains?(line, ":")
+  end
+
+  defp reference_footer_continuation_line?(line) do
+    not footer_boundary_line?(line) and
+      not Regex.match?(@line_pattern, line) and
+      not String.contains?(line, ":") and
+      Regex.match?(~r/^[A-Z0-9][A-Z0-9\-\/, ]*$/i, line)
+  end
+
+  defp footer_boundary_line?(line) do
+    Enum.any?(@footer_boundary_markers, &String.contains?(line, &1))
   end
 
   defp extract_optional_revision_date(text) do
