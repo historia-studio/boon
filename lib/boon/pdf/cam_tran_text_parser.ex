@@ -88,7 +88,7 @@ defmodule Boon.PDF.CamTranTextParser do
 
   defp extract_optional_reference(text) do
     case extract_reference_value(text) do
-      [reference] ->
+      reference when is_binary(reference) ->
         cleaned_reference =
           reference
           |> String.replace(~r/\s+/u, " ")
@@ -113,16 +113,56 @@ defmodule Boon.PDF.CamTranTextParser do
   end
 
   defp extract_reference_value(text) do
-    Regex.run(
-      ~r/Responsibility\s+Reference\s+Carrier\s+Account\s+Payment\s+Terms.*?\n\s*\S+\s+(.+?)\s+\d+\s+DAYS/is,
-      text,
-      capture: :all_but_first
-    ) ||
-      Regex.run(
-        ~r/Reference\s+(.*?)(?:\s+Carrier\s+Account|\s+Payment\s+Terms|\n\s*\d+\s+.+?$)/is,
-        text,
-        capture: :all_but_first
-      )
+    extract_bottom_reference_value(text) || extract_header_reference_value(text)
+  end
+
+  defp extract_bottom_reference_value(text) do
+    lines =
+      text
+      |> String.split("\n")
+      |> Enum.map(&String.trim/1)
+      |> Enum.filter(&(&1 != ""))
+
+    case last_line_item_index(lines) do
+      nil ->
+        nil
+
+      index ->
+        lines
+        |> Enum.drop(index + 1)
+        |> Enum.find(&reference_footer_line?/1)
+    end
+  end
+
+  defp extract_header_reference_value(text) do
+    case Regex.run(
+           ~r/Responsibility\s+Reference\s+Carrier\s+Account\s+Payment\s+Terms.*?\n\s*\S+\s+(.+?)\s+\d+\s+DAYS/is,
+           text,
+           capture: :all_but_first
+         ) ||
+           Regex.run(
+             ~r/Reference\s+(.*?)(?:\s+Carrier\s+Account|\s+Payment\s+Terms|\n\s*\d+\s+.+?$)/is,
+             text,
+             capture: :all_but_first
+           ) do
+      [reference] -> reference
+      _ -> nil
+    end
+  end
+
+  defp last_line_item_index(lines) do
+    lines
+    |> Enum.with_index()
+    |> Enum.reduce(nil, fn {line, index}, last_index ->
+      if Regex.match?(@line_pattern, line), do: index, else: last_index
+    end)
+  end
+
+  defp reference_footer_line?(line) do
+    String.contains?(line, ",") and
+      Regex.match?(~r/^[A-Z0-9][A-Z0-9\-\/ ]*(?:,\s*[^,\n]+)+$/i, line) and
+      not Regex.match?(@line_pattern, line) and
+      not String.contains?(line, ":")
   end
 
   defp extract_optional_revision_date(text) do
