@@ -2,7 +2,7 @@ defmodule BoonWeb.WorkPackageLive.Show do
   use BoonWeb, :live_view
 
   alias Boon.Operations
-  alias Boon.Printing.{Dispatcher, ItemNumber, LabelTransport}
+  alias Boon.Printing.{Dispatcher, ItemNumber, LabelTransport, PalletTagTransport}
   alias Boon.ShippingLocation
 
   @impl true
@@ -27,6 +27,17 @@ defmodule BoonWeb.WorkPackageLive.Show do
      )}
   end
 
+  def handle_event("print_work_package_pallet_tags", _params, socket) do
+    {:noreply,
+     socket
+     |> print_pallet_tags(
+       Dispatcher.dispatch_work_package_pallet_tags(
+         socket.assigns.work_package,
+         pallet_tag_dispatch_options()
+       )
+     )}
+  end
+
   def handle_event(
         "print_purchase_order_labels",
         %{"purchase-order-id" => purchase_order_id},
@@ -44,6 +55,28 @@ defmodule BoonWeb.WorkPackageLive.Show do
              socket.assigns.work_package,
              purchase_order,
              label_dispatch_options()
+           )
+         )}
+    end
+  end
+
+  def handle_event(
+        "print_purchase_order_pallet_tags",
+        %{"purchase-order-id" => purchase_order_id},
+        socket
+      ) do
+    case find_purchase_order(socket.assigns.work_package, purchase_order_id) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "That purchase order could not be found.")}
+
+      purchase_order ->
+        {:noreply,
+         socket
+         |> print_pallet_tags(
+           Dispatcher.dispatch_purchase_order_pallet_tags(
+             socket.assigns.work_package,
+             purchase_order,
+             pallet_tag_dispatch_options()
            )
          )}
     end
@@ -105,6 +138,17 @@ defmodule BoonWeb.WorkPackageLive.Show do
               </div>
 
               <div class="flex flex-wrap gap-3">
+                <BoonWeb.Components.Button.button
+                  id="print-work-package-pallet-tags"
+                  type="button"
+                  variant="outline"
+                  color="danger"
+                  icon="hero-document-duplicate"
+                  size="medium"
+                  phx-click="print_work_package_pallet_tags"
+                >
+                  Print All Pallet Tags
+                </BoonWeb.Components.Button.button>
                 <BoonWeb.Components.Button.button
                   id="print-work-package-labels"
                   type="button"
@@ -197,6 +241,19 @@ defmodule BoonWeb.WorkPackageLive.Show do
                     </div>
 
                     <BoonWeb.Components.Button.button
+                      id={"print-purchase-order-pallet-tags-#{purchase_order.id}"}
+                      type="button"
+                      variant="outline"
+                      color="danger"
+                      icon="hero-document-duplicate"
+                      size="small"
+                      phx-click="print_purchase_order_pallet_tags"
+                      phx-value-purchase-order-id={purchase_order.id}
+                    >
+                      Print PO Pallet Tags
+                    </BoonWeb.Components.Button.button>
+
+                    <BoonWeb.Components.Button.button
                       id={"print-purchase-order-labels-#{purchase_order.id}"}
                       type="button"
                       variant="outline"
@@ -278,6 +335,21 @@ defmodule BoonWeb.WorkPackageLive.Show do
                 </:col>
                 <:action :let={line}>
                   <BoonWeb.Components.Button.button
+                    id={"print-line-pallet-tags-#{line.id}"}
+                    type="button"
+                    variant="ghost"
+                    color="danger"
+                    size="extra_small"
+                    circle
+                    icon="hero-document-duplicate"
+                    title="Pallet tags print per purchase order, not per individual line"
+                    aria-label="Pallet tags print per purchase order, not per individual line"
+                    disabled
+                    class="cursor-not-allowed opacity-40"
+                  />
+                </:action>
+                <:action :let={line}>
+                  <BoonWeb.Components.Button.button
                     id={"print-line-labels-#{line.id}"}
                     type="button"
                     variant="ghost"
@@ -330,6 +402,23 @@ defmodule BoonWeb.WorkPackageLive.Show do
     end
   end
 
+  defp print_pallet_tags(socket, {:ok, result}) do
+    case result.status do
+      :completed ->
+        put_flash(
+          socket,
+          :info,
+          "Printed #{result.label_count} pallet tags to #{result.target_printer}."
+        )
+
+      :skipped ->
+        put_flash(socket, :error, result.error || "No pallet tags were available to print.")
+
+      :failed ->
+        put_flash(socket, :error, result.error || "Pallet tag printing failed.")
+    end
+  end
+
   defp find_purchase_order(work_package, purchase_order_id) do
     Enum.find(work_package.purchase_orders, &(&1.id == purchase_order_id))
   end
@@ -344,6 +433,16 @@ defmodule BoonWeb.WorkPackageLive.Show do
     [
       label_transport: Keyword.get(printing_config, :label_transport_module, LabelTransport),
       label_transport_opts: Keyword.get(printing_config, :label_transport_opts, [])
+    ]
+  end
+
+  defp pallet_tag_dispatch_options do
+    printing_config = Application.get_env(:boon, :printing, [])
+
+    [
+      pallet_tag_transport:
+        Keyword.get(printing_config, :pallet_tag_transport_module, PalletTagTransport),
+      pallet_tag_transport_opts: Keyword.get(printing_config, :pallet_tag_transport_opts, [])
     ]
   end
 

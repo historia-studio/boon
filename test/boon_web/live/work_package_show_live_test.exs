@@ -18,6 +18,20 @@ defmodule BoonWeb.WorkPackageShowLiveTest do
     end
   end
 
+  defmodule PalletTagTransportStub do
+    @behaviour Boon.Printing.PalletTagTransport
+
+    @impl true
+    def print(printer_name, pdf_path, opts) do
+      if notify = Keyword.get(opts, :notify) do
+        pdf_header = pdf_path |> File.read!() |> binary_part(0, 8)
+        send(notify, {:pallet_tag_printed, printer_name, pdf_path, pdf_header})
+      end
+
+      Keyword.get(opts, :result, :ok)
+    end
+  end
+
   setup do
     printing_config = Application.get_env(:boon, :printing, [])
 
@@ -26,7 +40,9 @@ defmodule BoonWeb.WorkPackageShowLiveTest do
       :printing,
       Keyword.merge(printing_config,
         label_transport_module: LabelTransportStub,
-        label_transport_opts: [notify: self()]
+        label_transport_opts: [notify: self()],
+        pallet_tag_transport_module: PalletTagTransportStub,
+        pallet_tag_transport_opts: [notify: self()]
       )
     )
 
@@ -75,6 +91,35 @@ defmodule BoonWeb.WorkPackageShowLiveTest do
 
     assert_receive {:label_printed, "Label Maker", line_zpl}
     assert line_zpl =~ tank_line.item_number
+  end
+
+  test "work package screen prints pallet tags for work package and purchase order", %{conn: conn} do
+    work_package = work_package_fixture()
+    [purchase_order] = work_package.purchase_orders
+    [tank_line, cabinet_line, lid_line] = purchase_order.lines
+
+    {:ok, view, _html} = live(conn, ~p"/work-packages/#{work_package.id}")
+
+    assert has_element?(view, "#print-work-package-pallet-tags")
+    assert has_element?(view, "#print-purchase-order-pallet-tags-#{purchase_order.id}")
+    assert has_element?(view, "#print-line-pallet-tags-#{tank_line.id}[disabled]")
+    assert has_element?(view, "#print-line-pallet-tags-#{cabinet_line.id}[disabled]")
+    assert has_element?(view, "#print-line-pallet-tags-#{lid_line.id}[disabled]")
+
+    view
+    |> element("#print-work-package-pallet-tags")
+    |> render_click()
+
+    assert_receive {:pallet_tag_printed, "Chilliwack", work_package_pdf_path, "%PDF-1.4"}
+    assert File.exists?(work_package_pdf_path)
+    assert render(view) =~ "Printed 1 pallet tags to Chilliwack."
+
+    view
+    |> element("#print-purchase-order-pallet-tags-#{purchase_order.id}")
+    |> render_click()
+
+    assert_receive {:pallet_tag_printed, "Chilliwack", purchase_order_pdf_path, "%PDF-1.4"}
+    assert File.exists?(purchase_order_pdf_path)
   end
 
   defp work_package_fixture do

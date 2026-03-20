@@ -96,6 +96,21 @@ defmodule Boon.Printing.Dispatcher do
      )}
   end
 
+  @spec dispatch_work_package_pallet_tags(map, keyword) :: {:ok, map}
+  def dispatch_work_package_pallet_tags(work_package, opts \\ []) do
+    results =
+      Enum.map(work_package.purchase_orders, fn purchase_order ->
+        dispatch_pallet_tags_for_purchase_order(work_package, purchase_order, opts)
+      end)
+
+    {:ok, summarize_pallet_tag_results(results)}
+  end
+
+  @spec dispatch_purchase_order_pallet_tags(map, map, keyword) :: {:ok, map}
+  def dispatch_purchase_order_pallet_tags(work_package, purchase_order, opts \\ []) do
+    {:ok, dispatch_pallet_tags_for_purchase_order(work_package, purchase_order, opts)}
+  end
+
   defp dispatch_labels(work_package, opts) do
     {:ok, result} = dispatch_work_package_labels(work_package, opts)
     result
@@ -377,6 +392,51 @@ defmodule Boon.Printing.Dispatcher do
       nil -> ShippingLocation.shared_label_printer()
       printer -> printer
     end
+  end
+
+  defp summarize_pallet_tag_results(results) do
+    errors =
+      results
+      |> Enum.flat_map(fn result ->
+        case result do
+          %{error: error} when is_binary(error) -> [error]
+          _ -> []
+        end
+      end)
+
+    target_printer =
+      results
+      |> Enum.map(& &1.target_printer)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+      |> Enum.join(", ")
+      |> case do
+        "" -> nil
+        value -> value
+      end
+
+    tag_count =
+      results
+      |> Enum.map(&(&1.label_count || 0))
+      |> Enum.sum()
+
+    status =
+      cond do
+        errors != [] -> :failed
+        tag_count > 0 -> :completed
+        true -> :skipped
+      end
+
+    %{
+      document_type: @pallet_tag_document_type,
+      status: status,
+      target_printer: target_printer,
+      error: if(errors == [], do: nil, else: Enum.join(errors, " ")),
+      payload_path: nil,
+      print_job: nil,
+      print_jobs: results,
+      label_count: tag_count
+    }
   end
 
   defp build_payload_path(opts, parts, extension) when is_list(parts) do
