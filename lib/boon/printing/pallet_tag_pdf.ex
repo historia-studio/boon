@@ -4,9 +4,18 @@ defmodule Boon.Printing.PalletTagPdf do
   """
 
   alias Boon.ShippingLocation
+  alias EQRCode.Matrix
 
   @page_width 612
   @page_height 792
+  @font_name "Courier-Bold"
+  @max_font_size 80
+  @min_font_size 42
+  @line_gap 12
+  @qr_size 160
+  @qr_y 46
+  @text_top 708
+  @text_bottom 246
 
   @spec render([map]) :: binary
   def render(tags) when is_list(tags) and tags != [] do
@@ -58,7 +67,7 @@ defmodule Boon.Printing.PalletTagPdf do
     base_objects = [
       "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
       "2 0 obj\n<< /Type /Pages /Kids [#{kids}] /Count #{length(tags)} >>\nendobj\n",
-      "3 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n"
+      "3 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /#{@font_name} >>\nendobj\n"
     ]
 
     page_objects =
@@ -66,15 +75,19 @@ defmodule Boon.Printing.PalletTagPdf do
       |> Enum.with_index()
       |> Enum.flat_map(fn {tag, index} ->
         content = page_content(tag)
+        qr_image = qr_image_object(tag)
         page_object = page_object_number(index)
         content_object = content_object_number(index)
+        image_object_ref = image_object_number(index)
 
         [
           "#{page_object} 0 obj\n" <>
             "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 #{@page_width} #{@page_height}] " <>
-            "/Resources << /Font << /F1 3 0 R >> >> /Contents #{content_object} 0 R >>\n" <>
+            "/Resources << /Font << /F1 3 0 R >> /XObject << /ImQR #{image_object_ref} 0 R >> >> " <>
+            "/Contents #{content_object} 0 R >>\n" <>
             "endobj\n",
-          "#{content_object} 0 obj\n<< /Length #{byte_size(content)} >>\nstream\n#{content}\nendstream\nendobj\n"
+          "#{content_object} 0 obj\n<< /Length #{byte_size(content)} >>\nstream\n#{content}\nendstream\nendobj\n",
+          image_object(qr_image, image_object_ref)
         ]
       end)
 
@@ -85,22 +98,97 @@ defmodule Boon.Printing.PalletTagPdf do
     ship_to = ShippingLocation.label(tag.ship_to) || tag.ship_to || "-"
 
     [
-      text_line(72, 740, 26, "PALLET TAG"),
-      text_line(72, 700, 18, "Work Package: #{tag.work_package_number}"),
-      text_line(72, 670, 16, "PO Number: #{tag.po_number}"),
-      text_line(72, 640, 16, "PO Reference: #{tag.po_reference || "-"}"),
-      text_line(72, 610, 16, "Color: #{tag.color || "-"}"),
-      text_line(72, 560, 18, "Tank Item Number: #{tag.tank_item_number}"),
-      text_line(72, 530, 18, "Cabinet Item Number: #{tag.cabinet_item_number}"),
-      text_line(72, 490, 16, "Ship To: #{ship_to}"),
-      text_line(72, 460, 16, "Pallet Pair: #{tag.pair_number}"),
-      text_line(72, 430, 10, "Ship URL: #{tag.shipping_url || "-"}")
+      "WP #{tag.work_package_number}",
+      "PO #{tag.po_number}",
+      reference_prefix(tag.po_reference),
+      tag.color || "-",
+      tag.tank_item_number,
+      tag.cabinet_item_number,
+      "#{ship_to} #{tag.pair_number}"
     ]
+    |> centered_text_block()
+    |> Kernel.++([qr_draw_command()])
     |> Enum.join("\n")
   end
 
   defp text_line(x, y, size, text) do
     "BT /F1 #{size} Tf 1 0 0 1 #{x} #{y} Tm (#{escape_text(text)}) Tj ET"
+  end
+
+  defp centered_text_block(lines) do
+    line_count = length(lines)
+    available_height = @text_top - @text_bottom
+    font_size = resolved_font_size(lines)
+    block_height = line_count * font_size + max(line_count - 1, 0) * @line_gap
+    start_y = @text_bottom + div(available_height - block_height, 2) + block_height - font_size
+
+    Enum.with_index(lines)
+    |> Enum.map(fn {line, index} ->
+      y = start_y - index * (font_size + @line_gap)
+      x = centered_x(line, font_size)
+      text_line(x, y, font_size, line)
+    end)
+  end
+
+  defp resolved_font_size(lines) do
+    lines
+    |> Enum.map(&fit_font_size/1)
+    |> Enum.min(fn -> @max_font_size end)
+    |> min(@max_font_size)
+    |> max(@min_font_size)
+  end
+
+  defp fit_font_size(text) do
+    max_width = @page_width - 64
+    chars = text |> to_string() |> String.length() |> max(1)
+    trunc(max_width / (chars * 0.6))
+  end
+
+  defp centered_x(text, font_size) do
+    text_width = String.length(to_string(text)) * font_size * 0.6
+    round((@page_width - text_width) / 2)
+  end
+
+  defp qr_draw_command do
+    qr_x = div(@page_width - @qr_size, 2)
+
+    "q #{@qr_size} 0 0 #{@qr_size} #{qr_x} #{@qr_y} cm /ImQR Do Q"
+  end
+
+  defp qr_image_object(tag) do
+    matrix = EQRCode.encode(tag.shipping_url || "-")
+    size = Matrix.size(matrix)
+
+    %{
+      width: size,
+      height: size,
+      stream: qr_pixel_stream(matrix)
+    }
+  end
+
+  defp image_object(%{width: width, height: height, stream: stream}, object_number) do
+    compressed = :zlib.compress(stream)
+
+    "#{object_number} 0 obj\n" <>
+      "<< /Type /XObject /Subtype /Image /Width #{width} /Height #{height} " <>
+      "/ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /FlateDecode " <>
+      "/Length #{byte_size(compressed)} >>\nstream\n" <>
+      compressed <> "\nendstream\nendobj\n"
+  end
+
+  defp qr_pixel_stream(%Matrix{matrix: matrix}) do
+    matrix
+    |> Tuple.to_list()
+    |> Enum.map(fn row ->
+      row
+      |> Tuple.to_list()
+      |> Enum.map(fn
+        1 -> <<0>>
+        _ -> <<255>>
+      end)
+      |> IO.iodata_to_binary()
+    end)
+    |> IO.iodata_to_binary()
   end
 
   defp escape_text(text) do
@@ -111,6 +199,21 @@ defmodule Boon.Printing.PalletTagPdf do
     |> String.replace(")", "\\)")
   end
 
-  defp page_object_number(index), do: 4 + index * 2
+  defp reference_prefix(nil), do: "-"
+
+  defp reference_prefix(reference) do
+    reference
+    |> to_string()
+    |> String.split(",", parts: 2)
+    |> List.first()
+    |> String.trim()
+    |> case do
+      "" -> "-"
+      prefix -> prefix
+    end
+  end
+
+  defp page_object_number(index), do: 4 + index * 3
   defp content_object_number(index), do: page_object_number(index) + 1
+  defp image_object_number(index), do: page_object_number(index) + 2
 end
