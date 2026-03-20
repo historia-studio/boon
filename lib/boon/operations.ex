@@ -1,13 +1,14 @@
 defmodule Boon.Operations do
   use Ash.Domain
 
-  alias Boon.Operations.{PurchaseOrder, PurchaseOrderLine, WorkPackage}
+  alias Boon.Operations.{PrintJob, PurchaseOrder, PurchaseOrderLine, WorkPackage}
   alias Boon.Repo
 
   resources do
     resource(Boon.Operations.WorkPackage)
     resource(Boon.Operations.PurchaseOrder)
     resource(Boon.Operations.PurchaseOrderLine)
+    resource(Boon.Operations.PrintJob)
   end
 
   def list_work_packages do
@@ -45,6 +46,10 @@ defmodule Boon.Operations do
       purchase_orders: purchase_orders,
       purchase_order_lines: purchase_order_lines
     }
+  end
+
+  def create_print_job(attrs) do
+    Ash.create(PrintJob, attrs)
   end
 
   def create_work_package_entry(attrs) do

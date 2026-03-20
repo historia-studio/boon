@@ -9,14 +9,18 @@ defmodule Boon.ShippingLocation do
       recipient: "CAM TRAN CO LTD.",
       street: "8841 Charles St.",
       locality: "Chilliwack, BC V2P 7H9",
-      printer_paper: "chilliwack"
+      printer_paper: "chilliwack",
+      pallet_tag_printer: "Chilliwack",
+      label_printer: "Label Maker"
     },
     "spruce_grove" => %{
       label: "Spruce Grove",
       recipient: "CAM TRAN CO LTD.",
       street: "31 Schram Street",
       locality: "Spruce Grove, AB T7X 0G6",
-      printer_paper: "spruce_grove"
+      printer_paper: "spruce_grove",
+      pallet_tag_printer: "Spruce Grove",
+      label_printer: "Label Maker"
     }
   }
 
@@ -55,6 +59,16 @@ defmodule Boon.ShippingLocation do
   @spec printer_paper(value | nil) :: String.t() | nil
   def printer_paper(value) when is_binary(value), do: get_in(@locations, [value, :printer_paper])
   def printer_paper(_value), do: nil
+
+  @spec pallet_tag_printer(value | nil) :: String.t() | nil
+  def pallet_tag_printer(value) when is_binary(value),
+    do: get_in(@locations, [value, :pallet_tag_printer])
+
+  def pallet_tag_printer(_value), do: nil
+
+  @spec label_printer(value | nil) :: String.t() | nil
+  def label_printer(value) when is_binary(value), do: get_in(@locations, [value, :label_printer])
+  def label_printer(_value), do: nil
 
   @spec infer_from_text(String.t()) :: value | nil
   def infer_from_text(text) when is_binary(text) do

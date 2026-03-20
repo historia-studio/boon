@@ -66,5 +66,10 @@ defmodule Boon.Operations.PurchaseOrder do
       public?(true)
       destination_attribute(:purchase_order_id)
     end
+
+    has_many :print_jobs, Boon.Operations.PrintJob do
+      public?(true)
+      destination_attribute(:purchase_order_id)
+    end
   end
 end
