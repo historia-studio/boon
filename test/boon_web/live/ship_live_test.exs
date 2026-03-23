@@ -29,7 +29,7 @@ defmodule BoonWeb.ShipLiveTest do
 
     [shipment] = Ash.read!(Shipment)
     assert shipment.entry_count == 1
-    assert shipment.submitted_from == "DESKTOP-3BBMKIS"
+    assert shipment.submitted_from == "BOON"
   end
 
   defp work_package_fixture do

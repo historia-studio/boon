@@ -16,7 +16,7 @@ defmodule Boon.Printing.PalletTagPdfTest do
           ship_to: "chilliwack",
           pair_number: 1,
           pallet_type: "tank",
-          shipping_url: "http://DESKTOP-3BBMKIS:4000/ship?tag=token"
+          shipping_url: "http://BOON:4000/ship?tag=token"
         }
       ])
 

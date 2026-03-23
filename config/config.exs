@@ -13,7 +13,7 @@ config :boon,
   generators: [timestamp_type: :utc_datetime],
   pdf_intake_parser: Boon.PDF.HostParser,
   shipping: [
-    host: "DESKTOP-3BBMKIS",
+    host: "BOON",
     port: 4000,
     scheme: "http",
     draft_storage_key: "boon-shipment-draft-v1"
@@ -36,7 +36,7 @@ config :ex_money, default_cldr_backend: Boon.Cldr
 
 # Configure the endpoint
 config :boon, BoonWeb.Endpoint,
-  url: [host: "DESKTOP-3BBMKIS", port: 4000],
+  url: [host: "BOON", port: 4000],
   adapter: Bandit.PhoenixAdapter,
   render_errors: [
     formats: [html: BoonWeb.ErrorHTML, json: BoonWeb.ErrorJSON],

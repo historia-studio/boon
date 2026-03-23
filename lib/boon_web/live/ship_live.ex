@@ -294,7 +294,7 @@ defmodule BoonWeb.ShipLive do
 
   defp shipping_host do
     Application.get_env(:boon, :shipping, [])
-    |> Keyword.get(:host, "DESKTOP-3BBMKIS")
+    |> Keyword.get(:host, "BOON")
   end
 
   defp pallet_identity_label(tag) do
