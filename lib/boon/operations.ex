@@ -39,6 +39,22 @@ defmodule Boon.Operations do
     |> sort_work_package()
   end
 
+  def delete_work_package(id) when is_binary(id) do
+    case Ash.get(WorkPackage, id) do
+      {:ok, nil} -> {:error, "That work package could not be found."}
+      {:ok, work_package} -> delete_work_package(work_package)
+      {:error, error} -> {:error, [format_error(error)]}
+    end
+  end
+
+  def delete_work_package(%WorkPackage{} = work_package) do
+    case Ash.destroy(work_package) do
+      :ok -> :ok
+      {:ok, _destroyed} -> :ok
+      {:error, error} -> {:error, [format_error(error)]}
+    end
+  end
+
   def dashboard_counts do
     work_packages = list_work_packages()
 
@@ -156,7 +172,8 @@ defmodule Boon.Operations do
              create_resource(WorkPackage, %{number: attrs.number}),
            {:ok, _purchase_orders, purchase_order_notifications} <-
              create_purchase_orders(work_package, attrs.purchase_orders) do
-        {get_work_package!(work_package.id), work_package_notifications ++ purchase_order_notifications}
+        {get_work_package!(work_package.id),
+         work_package_notifications ++ purchase_order_notifications}
       else
         {:error, error} -> Repo.rollback(error)
       end
@@ -166,21 +183,26 @@ defmodule Boon.Operations do
         notify(notifications)
         {:ok, work_package}
 
-      {:error, errors} when is_list(errors) -> {:error, errors}
-      {:error, error} -> {:error, [format_error(error)]}
+      {:error, errors} when is_list(errors) ->
+        {:error, errors}
+
+      {:error, error} ->
+        {:error, [format_error(error)]}
     end
   end
 
   defp create_purchase_orders(work_package, purchase_orders) do
     purchase_orders
     |> Enum.reduce_while({:ok, [], []}, fn purchase_order_attrs,
-                                          {:ok, created_purchase_orders, notifications} ->
+                                           {:ok, created_purchase_orders, notifications} ->
       case create_purchase_order(work_package, purchase_order_attrs) do
         {:ok, purchase_order, purchase_order_notifications} ->
           {:cont,
-           {:ok, [purchase_order | created_purchase_orders], notifications ++ purchase_order_notifications}}
+           {:ok, [purchase_order | created_purchase_orders],
+            notifications ++ purchase_order_notifications}}
 
-        {:error, error} -> {:halt, {:error, error}}
+        {:error, error} ->
+          {:halt, {:error, error}}
       end
     end)
   end
@@ -195,7 +217,8 @@ defmodule Boon.Operations do
       work_package_id: work_package.id
     }
 
-    with {:ok, purchase_order, purchase_order_notifications} <- create_resource(PurchaseOrder, attrs),
+    with {:ok, purchase_order, purchase_order_notifications} <-
+           create_resource(PurchaseOrder, attrs),
          {:ok, _lines, line_notifications} <-
            create_purchase_order_lines(purchase_order, purchase_order_attrs.lines) do
       {:ok, purchase_order, purchase_order_notifications ++ line_notifications}
@@ -217,7 +240,8 @@ defmodule Boon.Operations do
         {:ok, line, line_notifications} ->
           {:cont, {:ok, [line | created_lines], notifications ++ line_notifications}}
 
-        {:error, error} -> {:halt, {:error, error}}
+        {:error, error} ->
+          {:halt, {:error, error}}
       end
     end)
   end

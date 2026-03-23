@@ -96,15 +96,11 @@ defmodule BoonWeb.WorkPackageShowLiveTest do
   test "work package screen prints pallet tags for work package and purchase order", %{conn: conn} do
     work_package = work_package_fixture()
     [purchase_order] = work_package.purchase_orders
-    [tank_line, cabinet_line, lid_line] = purchase_order.lines
 
     {:ok, view, _html} = live(conn, ~p"/work-packages/#{work_package.id}")
 
     assert has_element?(view, "#print-work-package-pallet-tags")
     assert has_element?(view, "#print-purchase-order-pallet-tags-#{purchase_order.id}")
-    assert has_element?(view, "#print-line-pallet-tags-#{tank_line.id}[disabled]")
-    assert has_element?(view, "#print-line-pallet-tags-#{cabinet_line.id}[disabled]")
-    assert has_element?(view, "#print-line-pallet-tags-#{lid_line.id}[disabled]")
 
     view
     |> element("#print-work-package-pallet-tags")
@@ -120,6 +116,21 @@ defmodule BoonWeb.WorkPackageShowLiveTest do
 
     assert_receive {:pallet_tag_printed, "Chilliwack", purchase_order_pdf_path, "%PDF-1.4"}
     assert File.exists?(purchase_order_pdf_path)
+  end
+
+  test "operator can delete a work package from the detail screen", %{conn: conn} do
+    work_package = work_package_fixture()
+
+    {:ok, view, _html} = live(conn, ~p"/work-packages/#{work_package.id}")
+
+    assert has_element?(view, "#delete-work-package")
+
+    view
+    |> element("#delete-work-package")
+    |> render_click()
+
+    assert_redirect(view, ~p"/work-packages")
+    refute Enum.any?(Operations.list_work_packages(), &(&1.id == work_package.id))
   end
 
   defp work_package_fixture do

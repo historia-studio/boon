@@ -38,6 +38,19 @@ defmodule BoonWeb.WorkPackageLive.Show do
      )}
   end
 
+  def handle_event("delete_work_package", _params, socket) do
+    case Operations.delete_work_package(socket.assigns.work_package) do
+      :ok ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Work package deleted.")
+         |> push_navigate(to: ~p"/work-packages")}
+
+      {:error, [message | _rest]} ->
+        {:noreply, put_flash(socket, :error, message)}
+    end
+  end
+
   def handle_event(
         "print_purchase_order_labels",
         %{"purchase-order-id" => purchase_order_id},
@@ -173,6 +186,17 @@ defmodule BoonWeb.WorkPackageLive.Show do
                 >
                   All Work Packages
                 </BoonWeb.Components.Button.button_link>
+                <BoonWeb.Components.Button.button
+                  id="delete-work-package"
+                  type="button"
+                  variant="outline"
+                  color="danger"
+                  icon="hero-trash"
+                  size="medium"
+                  phx-click="delete_work_package"
+                >
+                  Delete Work Package
+                </BoonWeb.Components.Button.button>
               </div>
             </div>
 
