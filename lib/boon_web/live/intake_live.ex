@@ -174,7 +174,7 @@ defmodule BoonWeb.IntakeLive do
     entry = normalize_entry(params)
 
     with {:ok, attrs} <- validate_entry(entry),
-         {:ok, work_package} <- Operations.create_work_package_entry(attrs) do
+         {:ok, work_package} <- Operations.save_work_package_entry(attrs) do
       {:noreply,
        socket
        |> put_flash(:info, "Work package saved")

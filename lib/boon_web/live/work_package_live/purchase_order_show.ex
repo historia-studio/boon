@@ -104,6 +104,19 @@ defmodule BoonWeb.WorkPackageLive.PurchaseOrderShow do
     end
   end
 
+  def handle_event("delete_purchase_order", _params, socket) do
+    case Operations.delete_purchase_order(socket.assigns.purchase_order) do
+      :ok ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Purchase order deleted.")
+         |> push_navigate(to: ~p"/work-packages/#{socket.assigns.work_package.id}")}
+
+      {:error, [message | _rest]} ->
+        {:noreply, put_flash(socket, :error, message)}
+    end
+  end
+
   def handle_event("print_purchase_order_labels", _params, socket) do
     {:noreply,
      socket
@@ -173,6 +186,18 @@ defmodule BoonWeb.WorkPackageLive.PurchaseOrderShow do
               phx-click="start_edit_purchase_order"
             >
               Edit PO
+            </BoonWeb.Components.Button.button>
+            <BoonWeb.Components.Button.button
+              :if={!@editing_purchase_order}
+              id="delete-purchase-order"
+              type="button"
+              variant="outline"
+              color="danger"
+              icon="hero-trash"
+              size="medium"
+              phx-click="delete_purchase_order"
+            >
+              Delete PO
             </BoonWeb.Components.Button.button>
             <BoonWeb.Components.Button.button
               id="print-purchase-order-pallet-tags"

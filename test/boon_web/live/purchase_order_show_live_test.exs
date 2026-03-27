@@ -153,6 +153,35 @@ defmodule BoonWeb.PurchaseOrderShowLiveTest do
            ]
   end
 
+  test "operator can delete a purchase order from the dedicated purchase order page", %{
+    conn: conn
+  } do
+    work_package = multi_purchase_order_fixture()
+    [purchase_order_to_keep, purchase_order_to_delete] = work_package.purchase_orders
+
+    {:ok, view, _html} =
+      live(
+        conn,
+        ~p"/work-packages/#{work_package.id}/purchase-orders/#{purchase_order_to_delete.id}"
+      )
+
+    assert has_element?(view, "#delete-purchase-order")
+
+    view
+    |> element("#delete-purchase-order")
+    |> render_click()
+
+    assert_redirect(view, ~p"/work-packages/#{work_package.id}")
+
+    updated_work_package = Operations.get_work_package!(work_package.id)
+    assert Enum.map(updated_work_package.purchase_orders, & &1.id) == [purchase_order_to_keep.id]
+
+    refute Enum.any?(
+             updated_work_package.purchase_orders,
+             &(&1.id == purchase_order_to_delete.id)
+           )
+  end
+
   defp work_package_fixture do
     {:ok, work_package} =
       Operations.create_work_package_entry(%{
@@ -168,6 +197,39 @@ defmodule BoonWeb.PurchaseOrderShowLiveTest do
               %{line: 1, item_number: "86-SA-T100", quantity: 1, ship_date: ~D[2026-04-10]},
               %{line: 2, item_number: "86-SA-C100", quantity: 1, ship_date: ~D[2026-04-10]},
               %{line: 3, item_number: "86-SA-L100", quantity: 1, ship_date: ~D[2026-04-10]}
+            ]
+          }
+        ]
+      })
+
+    Operations.get_work_package!(work_package.id)
+  end
+
+  defp multi_purchase_order_fixture do
+    {:ok, work_package} =
+      Operations.create_work_package_entry(%{
+        number: "WP-#{System.unique_integer([:positive])}",
+        purchase_orders: [
+          %{
+            po_number: "PO-#{System.unique_integer([:positive])}",
+            order_date: ~D[2026-03-20],
+            revision_date: ~D[2026-03-21],
+            reference: "TRANSFORMER, ANSI/IEEE GREEN, PRIORITY",
+            ship_to: "chilliwack",
+            lines: [
+              %{line: 1, item_number: "86-SA-T100", quantity: 1, ship_date: ~D[2026-04-10]},
+              %{line: 2, item_number: "86-SA-C100", quantity: 1, ship_date: ~D[2026-04-10]}
+            ]
+          },
+          %{
+            po_number: "PO-#{System.unique_integer([:positive])}",
+            order_date: ~D[2026-03-22],
+            revision_date: ~D[2026-03-23],
+            reference: "2M017553, 1730, 3 RAD, SEA FOAM, 84-1024300",
+            ship_to: "spruce_grove",
+            lines: [
+              %{line: 1, item_number: "86-SA-T200", quantity: 1, ship_date: ~D[2026-04-12]},
+              %{line: 2, item_number: "86-SA-C200", quantity: 1, ship_date: ~D[2026-04-12]}
             ]
           }
         ]

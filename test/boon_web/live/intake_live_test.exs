@@ -138,4 +138,118 @@ defmodule BoonWeb.IntakeLiveTest do
              "86-SA-L1A2027900"
            ]
   end
+
+  test "duplicate work package updates a matching purchase order", %{conn: conn} do
+    {:ok, existing_work_package} =
+      Operations.create_work_package_entry(%{
+        number: "12",
+        purchase_orders: [
+          %{
+            po_number: "63131",
+            order_date: ~D[2026-03-12],
+            revision_date: ~D[2026-03-12],
+            reference: "OLD REFERENCE",
+            ship_to: "chilliwack",
+            lines: [
+              %{line: 1, item_number: "86-SA-T100", ship_date: ~D[2026-03-20], quantity: 1}
+            ]
+          }
+        ]
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/intake")
+
+    params = %{
+      "number" => "12",
+      "purchase_orders" => %{
+        "0" => %{
+          "po_number" => "63131",
+          "order_date" => "2026-03-14",
+          "revision_date" => "2026-03-12",
+          "reference" => "UPDATED REFERENCE",
+          "ship_to" => "spruce_grove",
+          "lines" => %{
+            "0" => %{
+              "line" => "2",
+              "item_number" => "86-SA-T200",
+              "ship_date" => "2026-03-26",
+              "quantity" => "3"
+            }
+          }
+        }
+      }
+    }
+
+    render_submit(view, "save", %{"work_package" => params})
+
+    assert_redirect(view, ~p"/work-packages/#{existing_work_package.id}")
+
+    saved_work_package = Operations.get_work_package!(existing_work_package.id)
+    assert saved_work_package.number == "12"
+    assert length(saved_work_package.purchase_orders) == 1
+
+    [purchase_order] = saved_work_package.purchase_orders
+    assert purchase_order.po_number == "63131"
+    assert purchase_order.order_date == ~D[2026-03-14]
+    assert purchase_order.reference == "UPDATED REFERENCE"
+    assert purchase_order.ship_to == "spruce_grove"
+    assert Enum.map(purchase_order.lines, & &1.line) == [2]
+    assert Enum.map(purchase_order.lines, & &1.item_number) == ["86-SA-T200"]
+  end
+
+  test "duplicate work package creates a new purchase order when no match exists", %{conn: conn} do
+    {:ok, existing_work_package} =
+      Operations.create_work_package_entry(%{
+        number: "13",
+        purchase_orders: [
+          %{
+            po_number: "63132",
+            order_date: ~D[2026-03-12],
+            revision_date: ~D[2026-03-12],
+            reference: "EXISTING PO",
+            ship_to: "chilliwack",
+            lines: [
+              %{line: 1, item_number: "86-SA-T300", ship_date: ~D[2026-03-20], quantity: 1}
+            ]
+          }
+        ]
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/intake")
+
+    params = %{
+      "number" => "13",
+      "purchase_orders" => %{
+        "0" => %{
+          "po_number" => "63133",
+          "order_date" => "2026-03-15",
+          "revision_date" => "2026-03-15",
+          "reference" => "NEW PO",
+          "ship_to" => "spruce_grove",
+          "lines" => %{
+            "0" => %{
+              "line" => "1",
+              "item_number" => "86-SA-L300",
+              "ship_date" => "2026-03-27",
+              "quantity" => "2"
+            }
+          }
+        }
+      }
+    }
+
+    render_submit(view, "save", %{"work_package" => params})
+
+    assert_redirect(view, ~p"/work-packages/#{existing_work_package.id}")
+
+    saved_work_package = Operations.get_work_package!(existing_work_package.id)
+    assert length(saved_work_package.purchase_orders) == 2
+
+    assert Enum.map(saved_work_package.purchase_orders, & &1.po_number) == ["63132", "63133"]
+
+    new_purchase_order = Enum.find(saved_work_package.purchase_orders, &(&1.po_number == "63133"))
+    assert new_purchase_order.reference == "NEW PO"
+    assert new_purchase_order.ship_to == "spruce_grove"
+    assert Enum.map(new_purchase_order.lines, & &1.item_number) == ["86-SA-L300"]
+  end
 end

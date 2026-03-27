@@ -45,6 +45,30 @@ defmodule Boon.Operations do
     |> sort_purchase_order()
   end
 
+  def save_work_package_entry(attrs) do
+    Repo.transaction(fn ->
+      with {:ok, work_package, work_package_notifications} <-
+             find_or_create_work_package(attrs.number),
+           {:ok, _purchase_orders, purchase_order_notifications, work_package} <-
+             merge_purchase_orders(work_package, attrs.purchase_orders) do
+        {work_package, work_package_notifications ++ purchase_order_notifications}
+      else
+        {:error, error} -> Repo.rollback(error)
+      end
+    end)
+    |> case do
+      {:ok, {work_package, notifications}} ->
+        notify(notifications)
+        {:ok, work_package}
+
+      {:error, errors} when is_list(errors) ->
+        {:error, errors}
+
+      {:error, error} ->
+        {:error, [format_error(error)]}
+    end
+  end
+
   def delete_work_package(id) when is_binary(id) do
     case Ash.get(WorkPackage, id) do
       {:ok, nil} -> {:error, "That work package could not be found."}
@@ -55,6 +79,22 @@ defmodule Boon.Operations do
 
   def delete_work_package(%WorkPackage{} = work_package) do
     case Ash.destroy(work_package) do
+      :ok -> :ok
+      {:ok, _destroyed} -> :ok
+      {:error, error} -> {:error, [format_error(error)]}
+    end
+  end
+
+  def delete_purchase_order(id) when is_binary(id) do
+    case Ash.get(PurchaseOrder, id) do
+      {:ok, nil} -> {:error, ["That purchase order could not be found."]}
+      {:ok, purchase_order} -> delete_purchase_order(purchase_order)
+      {:error, error} -> {:error, [format_error(error)]}
+    end
+  end
+
+  def delete_purchase_order(%PurchaseOrder{} = purchase_order) do
+    case Ash.destroy(purchase_order) do
       :ok -> :ok
       {:ok, _destroyed} -> :ok
       {:error, error} -> {:error, [format_error(error)]}
@@ -76,22 +116,9 @@ defmodule Boon.Operations do
         |> Ash.load!([:lines, :work_package])
         |> sort_purchase_order()
 
-      purchase_order_attrs = %{
-        po_number: attrs.po_number,
-        order_date: attrs.order_date,
-        revision_date: attrs.revision_date,
-        reference: attrs.reference,
-        ship_to: attrs.ship_to,
-        work_package_id: purchase_order.work_package_id
-      }
-
-      with {:ok, updated_purchase_order, purchase_order_notifications} <-
-             update_resource(purchase_order, purchase_order_attrs),
-           {:ok, destroy_notifications} <- delete_purchase_order_lines(purchase_order.lines),
-           {:ok, _lines, line_notifications} <-
-             create_purchase_order_lines(updated_purchase_order, attrs.lines) do
-        {get_purchase_order!(purchase_order.id),
-         purchase_order_notifications ++ destroy_notifications ++ line_notifications}
+      with {:ok, _updated_purchase_order, purchase_order_notifications} <-
+             update_purchase_order_entry_in_transaction(purchase_order, attrs) do
+        {get_purchase_order!(purchase_order.id), purchase_order_notifications}
       else
         {:error, error} -> Repo.rollback(error)
       end
@@ -245,6 +272,59 @@ defmodule Boon.Operations do
     end
   end
 
+  defp find_or_create_work_package(number) do
+    case get_work_package_by_number(number) do
+      nil ->
+        with {:ok, work_package, notifications} <- create_resource(WorkPackage, %{number: number}) do
+          {:ok, get_work_package!(work_package.id), notifications}
+        end
+
+      work_package ->
+        {:ok, work_package, []}
+    end
+  end
+
+  defp merge_purchase_orders(work_package, purchase_orders) do
+    purchase_orders
+    |> Enum.reduce_while({:ok, [], [], work_package}, fn purchase_order_attrs,
+                                                         {:ok, saved_purchase_orders,
+                                                          notifications, current_work_package} ->
+      case merge_purchase_order(current_work_package, purchase_order_attrs) do
+        {:ok, purchase_order, purchase_order_notifications, refreshed_work_package} ->
+          {:cont,
+           {:ok, [purchase_order | saved_purchase_orders],
+            notifications ++ purchase_order_notifications, refreshed_work_package}}
+
+        {:error, error} ->
+          {:halt, {:error, error}}
+      end
+    end)
+    |> case do
+      {:ok, purchase_orders, notifications, refreshed_work_package} ->
+        {:ok, Enum.reverse(purchase_orders), notifications, refreshed_work_package}
+
+      {:error, error} ->
+        {:error, error}
+    end
+  end
+
+  defp merge_purchase_order(work_package, purchase_order_attrs) do
+    case find_matching_purchase_order(work_package, purchase_order_attrs) do
+      nil ->
+        with {:ok, purchase_order, purchase_order_notifications} <-
+               create_purchase_order(work_package, purchase_order_attrs) do
+          {:ok, purchase_order, purchase_order_notifications, get_work_package!(work_package.id)}
+        end
+
+      purchase_order ->
+        with {:ok, updated_purchase_order, purchase_order_notifications} <-
+               update_purchase_order_entry_in_transaction(purchase_order, purchase_order_attrs) do
+          {:ok, updated_purchase_order, purchase_order_notifications,
+           get_work_package!(work_package.id)}
+        end
+    end
+  end
+
   defp create_purchase_orders(work_package, purchase_orders) do
     purchase_orders
     |> Enum.reduce_while({:ok, [], []}, fn purchase_order_attrs,
@@ -298,6 +378,44 @@ defmodule Boon.Operations do
           {:halt, {:error, error}}
       end
     end)
+  end
+
+  defp update_purchase_order_entry_in_transaction(purchase_order, attrs) do
+    purchase_order_attrs = %{
+      po_number: attrs.po_number,
+      order_date: attrs.order_date,
+      revision_date: attrs.revision_date,
+      reference: attrs.reference,
+      ship_to: attrs.ship_to,
+      work_package_id: purchase_order.work_package_id
+    }
+
+    with {:ok, updated_purchase_order, purchase_order_notifications} <-
+           update_resource(purchase_order, purchase_order_attrs),
+         {:ok, destroy_notifications} <- delete_purchase_order_lines(purchase_order.lines),
+         {:ok, _lines, line_notifications} <-
+           create_purchase_order_lines(updated_purchase_order, attrs.lines) do
+      {:ok, updated_purchase_order,
+       purchase_order_notifications ++ destroy_notifications ++ line_notifications}
+    end
+  end
+
+  defp find_matching_purchase_order(work_package, purchase_order_attrs) do
+    Enum.find(work_package.purchase_orders, fn purchase_order ->
+      purchase_order.po_number == purchase_order_attrs.po_number and
+        purchase_order.revision_date == purchase_order_attrs.revision_date
+    end)
+  end
+
+  defp get_work_package_by_number(number) do
+    case from(work_package in "work_packages",
+           where: work_package.number == ^number,
+           select: work_package.id
+         )
+         |> Repo.one() do
+      nil -> nil
+      id -> get_work_package!(id)
+    end
   end
 
   defp delete_purchase_order_lines(lines) do
