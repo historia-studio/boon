@@ -93,6 +93,66 @@ defmodule BoonWeb.PurchaseOrderShowLiveTest do
     assert line_zpl =~ tank_line.item_number
   end
 
+  test "operator can edit purchase order details from the dedicated purchase order page", %{
+    conn: conn
+  } do
+    work_package = work_package_fixture()
+    [purchase_order] = work_package.purchase_orders
+
+    {:ok, view, _html} =
+      live(conn, ~p"/work-packages/#{work_package.id}/purchase-orders/#{purchase_order.id}")
+
+    view
+    |> element("#edit-purchase-order")
+    |> render_click()
+
+    assert has_element?(view, "#purchase-order-edit-form")
+
+    params = %{
+      "purchase_orders" => %{
+        "0" => %{
+          "po_number" => "PO-UPDATED",
+          "order_date" => "2026-03-24",
+          "revision_date" => "2026-03-25",
+          "reference" => "2M017553, 1730, SEA FOAM",
+          "ship_to" => "spruce_grove",
+          "lines" => %{
+            "0" => %{
+              "line" => "4",
+              "item_number" => "86-SA-T400",
+              "ship_date" => "2026-04-14",
+              "quantity" => "2"
+            },
+            "1" => %{
+              "line" => "5",
+              "item_number" => "86-SA-L400",
+              "ship_date" => "2026-04-15",
+              "quantity" => "1"
+            }
+          }
+        }
+      }
+    }
+
+    render_submit(view, "save_purchase_order", %{"purchase_order" => params})
+
+    assert render(view) =~ "PO PO-UPDATED"
+    assert render(view) =~ "Spruce Grove"
+
+    updated_work_package = Operations.get_work_package!(work_package.id)
+    [updated_purchase_order] = updated_work_package.purchase_orders
+
+    assert updated_purchase_order.po_number == "PO-UPDATED"
+    assert updated_purchase_order.reference == "2M017553, 1730, SEA FOAM"
+    assert updated_purchase_order.ship_to == "spruce_grove"
+    assert Enum.map(updated_purchase_order.lines, & &1.line) == [4, 5]
+
+    assert Enum.map(updated_purchase_order.lines, & &1.item_number) == [
+             "86-SA-T400",
+             "86-SA-L400"
+           ]
+  end
+
   defp work_package_fixture do
     {:ok, work_package} =
       Operations.create_work_package_entry(%{

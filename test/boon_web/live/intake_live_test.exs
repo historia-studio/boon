@@ -132,6 +132,7 @@ defmodule BoonWeb.IntakeLiveTest do
     [purchase_order] = saved_work_package.purchase_orders
 
     assert Enum.map(purchase_order.lines, & &1.line) == [2, 2]
+
     assert Enum.map(purchase_order.lines, & &1.item_number) == [
              "86-SA-T1C2042000",
              "86-SA-L1A2027900"

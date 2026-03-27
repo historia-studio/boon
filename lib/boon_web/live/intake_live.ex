@@ -297,192 +297,22 @@ defmodule BoonWeb.IntakeLive do
                   </BoonWeb.Components.Button.button>
                 </div>
 
-                <BoonWeb.Components.Card.card
-                  :for={{purchase_order, po_index} <- Enum.with_index(Map.get(@entry, "purchase_orders", []))}
-                  id={"purchase-order-#{po_index}"}
-                  variant="bordered"
-                  color="warning"
-                  rounded="extra_large"
-                  class="app-panel"
-                  padding="large"
-                >
-                  <BoonWeb.Components.Card.card_content space="large">
-                    <div class="flex flex-wrap items-center justify-between gap-4">
-                      <button
-                        type="button"
-                        phx-click="toggle_purchase_order"
-                        phx-value-index={po_index}
-                        class="flex items-center gap-3 text-left"
-                      >
-                        <.icon
-                          name={
-                            if MapSet.member?(@collapsed_purchase_orders, po_index),
-                              do: "hero-chevron-right",
-                              else: "hero-chevron-down"
-                          }
-                          class="h-4 w-4 text-amber-300"
-                        />
-                        <span class="app-kicker text-[0.68rem]">
-                          {purchase_order_title(purchase_order, po_index)}
-                        </span>
-                      </button>
-                      <div class="flex flex-wrap gap-3">
-                        <BoonWeb.Components.Button.button
-                          type="button"
-                          phx-click="add_line"
-                          phx-value-po-index={po_index}
-                          variant="subtle"
-                          color="warning"
-                          size="small"
-                          icon="hero-plus"
-                        >
-                          Add Line
-                        </BoonWeb.Components.Button.button>
-                        <BoonWeb.Components.Button.button
-                          :if={length(Map.get(@entry, "purchase_orders", [])) > 1}
-                          type="button"
-                          phx-click="remove_purchase_order"
-                          phx-value-index={po_index}
-                          variant="transparent"
-                          color="danger"
-                          size="small"
-                        >
-                          Remove PO
-                        </BoonWeb.Components.Button.button>
-                      </div>
-                    </div>
-
-                    <div :if={!MapSet.member?(@collapsed_purchase_orders, po_index)} class="space-y-4">
-                      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        <BoonWeb.Components.InputField.input
-                          id={"purchase-orders-#{po_index}-po-number"}
-                          name={purchase_order_input_name(@form.name, po_index, "po_number")}
-                          value={purchase_order["po_number"]}
-                          label="PO number"
-                          required
-                          autocomplete="off"
-                        />
-                        <BoonWeb.Components.InputField.input
-                          id={"purchase-orders-#{po_index}-order-date"}
-                          name={purchase_order_input_name(@form.name, po_index, "order_date")}
-                          value={purchase_order["order_date"]}
-                          label="Order date"
-                          type="date"
-                        />
-                        <BoonWeb.Components.InputField.input
-                          id={"purchase-orders-#{po_index}-revision-date"}
-                          name={purchase_order_input_name(@form.name, po_index, "revision_date")}
-                          value={purchase_order["revision_date"]}
-                          label="Revision date"
-                          type="date"
-                        />
-                        <BoonWeb.Components.InputField.input
-                          id={"purchase-orders-#{po_index}-reference"}
-                          name={purchase_order_input_name(@form.name, po_index, "reference")}
-                          value={purchase_order["reference"]}
-                          label="Reference"
-                        />
-                        <BoonWeb.Components.InputField.input
-                          id={"purchase-orders-#{po_index}-ship-to"}
-                          name={purchase_order_input_name(@form.name, po_index, "ship_to")}
-                          value={purchase_order["ship_to"]}
-                          label="Ship To"
-                          type="select"
-                          options={ShippingLocation.select_options()}
-                          prompt="Select shipping location"
-                          required
-                        />
-                      </div>
-
-                      <div class="space-y-4">
-                        <div
-                          :for={{line, line_index} <- Enum.with_index(purchase_order["lines"])}
-                          id={"purchase-order-#{po_index}-line-#{line_index}"}
-                          class="rounded-[1.5rem] border border-white/10 bg-[#0f0909] p-4"
-                        >
-                          <div class="mb-4 flex items-center justify-end gap-4">
-                            <BoonWeb.Components.Button.button
-                              :if={length(purchase_order["lines"]) > 1}
-                              type="button"
-                              phx-click="remove_line"
-                              phx-value-po-index={po_index}
-                              phx-value-line-index={line_index}
-                              variant="transparent"
-                              color="danger"
-                              size="extra_small"
-                            >
-                              Remove
-                            </BoonWeb.Components.Button.button>
-                          </div>
-
-                          <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                            <BoonWeb.Components.InputField.input
-                              id={"purchase-orders-#{po_index}-lines-#{line_index}-line"}
-                              name={
-                                purchase_order_line_input_name(
-                                  @form.name,
-                                  po_index,
-                                  line_index,
-                                  "line"
-                                )
-                              }
-                              value={line["line"]}
-                              label="Line number"
-                              type="number"
-                              min="1"
-                              required
-                            />
-                            <BoonWeb.Components.InputField.input
-                              id={"purchase-orders-#{po_index}-lines-#{line_index}-item-number"}
-                              name={
-                                purchase_order_line_input_name(
-                                  @form.name,
-                                  po_index,
-                                  line_index,
-                                  "item_number"
-                                )
-                              }
-                              value={line["item_number"]}
-                              label="Item number / description"
-                              required
-                            />
-                            <BoonWeb.Components.InputField.input
-                              id={"purchase-orders-#{po_index}-lines-#{line_index}-ship-date"}
-                              name={
-                                purchase_order_line_input_name(
-                                  @form.name,
-                                  po_index,
-                                  line_index,
-                                  "ship_date"
-                                )
-                              }
-                              value={line["ship_date"]}
-                              label="Ship date"
-                              type="date"
-                            />
-                            <BoonWeb.Components.InputField.input
-                              id={"purchase-orders-#{po_index}-lines-#{line_index}-quantity"}
-                              name={
-                                purchase_order_line_input_name(
-                                  @form.name,
-                                  po_index,
-                                  line_index,
-                                  "quantity"
-                                )
-                              }
-                              value={line["quantity"]}
-                              label="Quantity"
-                              type="number"
-                              min="1"
-                              step="1"
-                              required
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </BoonWeb.Components.Card.card_content>
-                </BoonWeb.Components.Card.card>
+                <BoonWeb.Components.PurchaseOrderEditor.editor
+                  :for={
+                    {purchase_order, po_index} <-
+                      Enum.with_index(Map.get(@entry, "purchase_orders", []))
+                  }
+                  form_name={@form.name}
+                  po_index={po_index}
+                  po_number={Map.get(purchase_order, "po_number", "")}
+                  order_date={Map.get(purchase_order, "order_date", "")}
+                  revision_date={Map.get(purchase_order, "revision_date", "")}
+                  reference={Map.get(purchase_order, "reference", "")}
+                  ship_to={Map.get(purchase_order, "ship_to", "")}
+                  lines={Map.get(purchase_order, "lines", [])}
+                  collapsed={MapSet.member?(@collapsed_purchase_orders, po_index)}
+                  purchase_order_count={length(Map.get(@entry, "purchase_orders", []))}
+                />
               </div>
 
               <div class="space-y-3">
@@ -570,13 +400,6 @@ defmodule BoonWeb.IntakeLive do
 
   defp empty_line do
     %{"line" => "", "item_number" => "", "ship_date" => "", "quantity" => ""}
-  end
-
-  defp purchase_order_title(purchase_order, po_index) do
-    case purchase_order |> Map.get("po_number", "") |> String.trim() do
-      "" -> "PO Draft #{po_index + 1}"
-      po_number -> "PO #{po_number}"
-    end
   end
 
   defp normalize_entry(params) do
@@ -672,43 +495,43 @@ defmodule BoonWeb.IntakeLive do
       lines
       |> Enum.with_index(1)
       |> Enum.reduce({[], []}, fn {line, line_index}, {normalized_lines, errors} ->
-      {line_number, line_number_error} =
-        parse_positive_integer(
-          line["line"],
-          "PO #{purchase_order_index} line #{line_index} line number"
-        )
+        {line_number, line_number_error} =
+          parse_positive_integer(
+            line["line"],
+            "PO #{purchase_order_index} line #{line_index} line number"
+          )
 
-      {quantity, quantity_error} =
-        parse_positive_integer(
-          line["quantity"],
-          "PO #{purchase_order_index} line #{line_index} quantity"
-        )
+        {quantity, quantity_error} =
+          parse_positive_integer(
+            line["quantity"],
+            "PO #{purchase_order_index} line #{line_index} quantity"
+          )
 
-      {ship_date, ship_date_error} =
-        parse_optional_date(
-          line["ship_date"],
-          "PO #{purchase_order_index} line #{line_index} ship date"
-        )
+        {ship_date, ship_date_error} =
+          parse_optional_date(
+            line["ship_date"],
+            "PO #{purchase_order_index} line #{line_index} ship date"
+          )
 
-      line_errors =
-        errors ++
-          required_field_error(
-            line["item_number"],
-            "PO #{purchase_order_index} line #{line_index} item number"
-          ) ++
-          List.wrap(line_number_error) ++
-          List.wrap(quantity_error) ++
-          List.wrap(ship_date_error)
+        line_errors =
+          errors ++
+            required_field_error(
+              line["item_number"],
+              "PO #{purchase_order_index} line #{line_index} item number"
+            ) ++
+            List.wrap(line_number_error) ++
+            List.wrap(quantity_error) ++
+            List.wrap(ship_date_error)
 
-      normalized_line = %{
-        line: line_number,
-        item_number: normalize_text(line["item_number"]),
-        ship_date: ship_date,
-        quantity: quantity
-      }
+        normalized_line = %{
+          line: line_number,
+          item_number: normalize_text(line["item_number"]),
+          ship_date: ship_date,
+          quantity: quantity
+        }
 
-      {[normalized_line | normalized_lines], line_errors}
-    end)
+        {[normalized_line | normalized_lines], line_errors}
+      end)
 
     normalized_lines = Enum.reverse(normalized_lines)
 
@@ -842,14 +665,6 @@ defmodule BoonWeb.IntakeLive do
 
   defp remove_at(list, index) when is_binary(index), do: remove_at(list, String.to_integer(index))
   defp remove_at(list, index), do: List.delete_at(list, index)
-
-  defp purchase_order_input_name(form_name, po_index, field_name) do
-    "#{form_name}[purchase_orders][#{po_index}][#{field_name}]"
-  end
-
-  defp purchase_order_line_input_name(form_name, po_index, line_index, field_name) do
-    "#{form_name}[purchase_orders][#{po_index}][lines][#{line_index}][#{field_name}]"
-  end
 
   defp reindex_collapsed_purchase_orders(collapsed_purchase_orders, removed_index)
        when is_binary(removed_index) do

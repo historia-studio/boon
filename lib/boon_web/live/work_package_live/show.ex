@@ -177,9 +177,7 @@ defmodule BoonWeb.WorkPackageLive.Show do
           row_id={fn purchase_order -> "purchase-order-row-#{purchase_order.id}" end}
           row_click={
             fn purchase_order ->
-              JS.navigate(
-                ~p"/work-packages/#{@work_package.id}/purchase-orders/#{purchase_order.id}"
-              )
+              JS.navigate(~p"/work-packages/#{@work_package.id}/purchase-orders/#{purchase_order.id}")
             end
           }
           variant="base_hoverable"

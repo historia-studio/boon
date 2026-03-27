@@ -55,7 +55,7 @@ defmodule BoonWeb.Components.FileField do
               <.icon name="hero-document" class="h-4 w-4 shrink-0 text-amber-300" />
               <span class="truncate">{entry.client_name}</span>
             </span>
-             <span class="shrink-0 text-xs text-stone-500">{entry.progress}%</span>
+            <span class="shrink-0 text-xs text-stone-500">{entry.progress}%</span>
           </li>
         </ul>
       </div>

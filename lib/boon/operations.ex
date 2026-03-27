@@ -39,6 +39,12 @@ defmodule Boon.Operations do
     |> sort_work_package()
   end
 
+  def get_purchase_order!(id) do
+    PurchaseOrder
+    |> Ash.get!(id, load: [:lines, :work_package])
+    |> sort_purchase_order()
+  end
+
   def delete_work_package(id) when is_binary(id) do
     case Ash.get(WorkPackage, id) do
       {:ok, nil} -> {:error, "That work package could not be found."}
@@ -52,6 +58,54 @@ defmodule Boon.Operations do
       :ok -> :ok
       {:ok, _destroyed} -> :ok
       {:error, error} -> {:error, [format_error(error)]}
+    end
+  end
+
+  def update_purchase_order_entry(id, attrs) when is_binary(id) do
+    case Ash.get(PurchaseOrder, id, load: [:lines, :work_package]) do
+      {:ok, nil} -> {:error, ["That purchase order could not be found."]}
+      {:ok, purchase_order} -> update_purchase_order_entry(purchase_order, attrs)
+      {:error, error} -> {:error, [format_error(error)]}
+    end
+  end
+
+  def update_purchase_order_entry(%PurchaseOrder{} = purchase_order, attrs) do
+    Repo.transaction(fn ->
+      purchase_order =
+        purchase_order
+        |> Ash.load!([:lines, :work_package])
+        |> sort_purchase_order()
+
+      purchase_order_attrs = %{
+        po_number: attrs.po_number,
+        order_date: attrs.order_date,
+        revision_date: attrs.revision_date,
+        reference: attrs.reference,
+        ship_to: attrs.ship_to,
+        work_package_id: purchase_order.work_package_id
+      }
+
+      with {:ok, updated_purchase_order, purchase_order_notifications} <-
+             update_resource(purchase_order, purchase_order_attrs),
+           {:ok, destroy_notifications} <- delete_purchase_order_lines(purchase_order.lines),
+           {:ok, _lines, line_notifications} <-
+             create_purchase_order_lines(updated_purchase_order, attrs.lines) do
+        {get_purchase_order!(purchase_order.id),
+         purchase_order_notifications ++ destroy_notifications ++ line_notifications}
+      else
+        {:error, error} -> Repo.rollback(error)
+      end
+    end)
+    |> case do
+      {:ok, {updated_purchase_order, notifications}} ->
+        notify(notifications)
+        {:ok, updated_purchase_order}
+
+      {:error, errors} when is_list(errors) ->
+        {:error, errors}
+
+      {:error, error} ->
+        {:error, [format_error(error)]}
     end
   end
 
@@ -246,15 +300,27 @@ defmodule Boon.Operations do
     end)
   end
 
+  defp delete_purchase_order_lines(lines) do
+    lines
+    |> Enum.reduce_while({:ok, []}, fn line, {:ok, notifications} ->
+      case destroy_resource(line) do
+        {:ok, line_notifications} -> {:cont, {:ok, notifications ++ line_notifications}}
+        {:error, error} -> {:halt, {:error, error}}
+      end
+    end)
+  end
+
   defp sort_work_package(work_package) do
     purchase_orders =
       work_package.purchase_orders
-      |> Enum.map(fn purchase_order ->
-        %{purchase_order | lines: Enum.sort_by(purchase_order.lines, & &1.line)}
-      end)
+      |> Enum.map(&sort_purchase_order/1)
       |> Enum.sort_by(&{&1.order_date || ~D[9999-12-31], &1.po_number})
 
     %{work_package | purchase_orders: purchase_orders}
+  end
+
+  defp sort_purchase_order(purchase_order) do
+    %{purchase_order | lines: Enum.sort_by(purchase_order.lines, & &1.line)}
   end
 
   defp fetch_first_entry([first_entry | _rest]), do: {:ok, first_entry}
@@ -392,6 +458,23 @@ defmodule Boon.Operations do
     case Ash.create(resource, attrs, return_notifications?: true) do
       {:ok, record, notifications} -> {:ok, record, notifications}
       {:ok, record} -> {:ok, record, []}
+      {:error, error} -> {:error, error}
+    end
+  end
+
+  defp update_resource(resource, attrs) do
+    case Ash.update(resource, attrs, return_notifications?: true) do
+      {:ok, record, notifications} -> {:ok, record, notifications}
+      {:ok, record} -> {:ok, record, []}
+      {:error, error} -> {:error, error}
+    end
+  end
+
+  defp destroy_resource(resource) do
+    case Ash.destroy(resource, return_notifications?: true) do
+      :ok -> {:ok, []}
+      {:ok, _destroyed, notifications} -> {:ok, notifications}
+      {:ok, _destroyed} -> {:ok, []}
       {:error, error} -> {:error, error}
     end
   end
