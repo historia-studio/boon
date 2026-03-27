@@ -171,55 +171,37 @@ defmodule BoonWeb.WorkPackageLive.Show do
           </BoonWeb.Components.Card.card_content>
         </BoonWeb.Components.Card.card>
 
-        <BoonWeb.Components.Card.card
-          variant="bordered"
-          color="warning"
-          rounded="extra_large"
-          class="app-panel"
-          padding="large"
+        <BoonWeb.Components.Table.table
+          id="purchase-orders-table"
+          rows={@work_package.purchase_orders}
+          row_id={fn purchase_order -> "purchase-order-row-#{purchase_order.id}" end}
+          row_click={
+            fn purchase_order ->
+              JS.navigate(
+                ~p"/work-packages/#{@work_package.id}/purchase-orders/#{purchase_order.id}"
+              )
+            end
+          }
+          variant="base_hoverable"
+          rounded="large"
+          class="text-stone-200"
         >
-          <BoonWeb.Components.Card.card_content space="large">
-            <div class="space-y-2">
-              <p class="app-kicker text-[0.68rem]">Purchase Orders</p>
-              <h2 class="text-2xl font-semibold text-stone-50">Open a purchase order page</h2>
-              <p class="text-sm text-stone-400">
-                Click any row to open a dedicated purchase-order page with line-level detail and print actions.
-              </p>
-            </div>
-
-            <BoonWeb.Components.Table.table
-              id="purchase-orders-table"
-              rows={@work_package.purchase_orders}
-              row_id={fn purchase_order -> "purchase-order-row-#{purchase_order.id}" end}
-              row_click={
-                fn purchase_order ->
-                  JS.navigate(
-                    ~p"/work-packages/#{@work_package.id}/purchase-orders/#{purchase_order.id}"
-                  )
-                end
-              }
-              variant="base_hoverable"
-              rounded="large"
-              class="text-stone-200"
-            >
-              <:col :let={purchase_order} label="PO Number">
-                <span class="font-semibold text-stone-50">PO {purchase_order.po_number}</span>
-              </:col>
-              <:col :let={purchase_order} label="Reference">
-                <span class="line-clamp-1 text-stone-400">{purchase_order.reference || "-"}</span>
-              </:col>
-              <:col :let={purchase_order} label="Ship To">
-                {ship_to_label(purchase_order.ship_to)}
-              </:col>
-              <:col :let={purchase_order} label="PO Lines">
-                {length(purchase_order.lines)}
-              </:col>
-              <:col :let={purchase_order} label="Revision">
-                <span class="text-stone-400">{format_date(purchase_order.revision_date)}</span>
-              </:col>
-            </BoonWeb.Components.Table.table>
-          </BoonWeb.Components.Card.card_content>
-        </BoonWeb.Components.Card.card>
+          <:col :let={purchase_order} label="PO Number">
+            <span class="font-semibold text-stone-50">PO {purchase_order.po_number}</span>
+          </:col>
+          <:col :let={purchase_order} label="Reference">
+            <span class="line-clamp-1 text-stone-400">{purchase_order.reference || "-"}</span>
+          </:col>
+          <:col :let={purchase_order} label="Ship To">
+            {ship_to_label(purchase_order.ship_to)}
+          </:col>
+          <:col :let={purchase_order} label="PO Lines">
+            {length(purchase_order.lines)}
+          </:col>
+          <:col :let={purchase_order} label="Revision">
+            <span class="text-stone-400">{format_date(purchase_order.revision_date)}</span>
+          </:col>
+        </BoonWeb.Components.Table.table>
       </section>
     </Layouts.app>
     """
