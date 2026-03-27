@@ -2,7 +2,7 @@ defmodule BoonWeb.WorkPackageLive.Show do
   use BoonWeb, :live_view
 
   alias Boon.Operations
-  alias Boon.Printing.{Dispatcher, ItemNumber, LabelTransport, PalletTagTransport}
+  alias Boon.Printing.{Dispatcher, LabelTransport, PalletTagTransport}
   alias Boon.ShippingLocation
 
   @impl true
@@ -48,74 +48,6 @@ defmodule BoonWeb.WorkPackageLive.Show do
 
       {:error, [message | _rest]} ->
         {:noreply, put_flash(socket, :error, message)}
-    end
-  end
-
-  def handle_event(
-        "print_purchase_order_labels",
-        %{"purchase-order-id" => purchase_order_id},
-        socket
-      ) do
-    case find_purchase_order(socket.assigns.work_package, purchase_order_id) do
-      nil ->
-        {:noreply, put_flash(socket, :error, "That purchase order could not be found.")}
-
-      purchase_order ->
-        {:noreply,
-         socket
-         |> print_labels(
-           Dispatcher.dispatch_purchase_order_labels(
-             socket.assigns.work_package,
-             purchase_order,
-             label_dispatch_options()
-           )
-         )}
-    end
-  end
-
-  def handle_event(
-        "print_purchase_order_pallet_tags",
-        %{"purchase-order-id" => purchase_order_id},
-        socket
-      ) do
-    case find_purchase_order(socket.assigns.work_package, purchase_order_id) do
-      nil ->
-        {:noreply, put_flash(socket, :error, "That purchase order could not be found.")}
-
-      purchase_order ->
-        {:noreply,
-         socket
-         |> print_pallet_tags(
-           Dispatcher.dispatch_purchase_order_pallet_tags(
-             socket.assigns.work_package,
-             purchase_order,
-             pallet_tag_dispatch_options()
-           )
-         )}
-    end
-  end
-
-  def handle_event(
-        "print_line_labels",
-        %{"purchase-order-id" => purchase_order_id, "line-id" => line_id},
-        socket
-      ) do
-    with purchase_order when not is_nil(purchase_order) <-
-           find_purchase_order(socket.assigns.work_package, purchase_order_id),
-         line when not is_nil(line) <- find_line(purchase_order, line_id) do
-      {:noreply,
-       socket
-       |> print_labels(
-         Dispatcher.dispatch_purchase_order_line_labels(
-           socket.assigns.work_package,
-           purchase_order,
-           line,
-           label_dispatch_options()
-         )
-       )}
-    else
-      _missing ->
-        {:noreply, put_flash(socket, :error, "That PO line could not be found.")}
     end
   end
 
@@ -239,145 +171,55 @@ defmodule BoonWeb.WorkPackageLive.Show do
           </BoonWeb.Components.Card.card_content>
         </BoonWeb.Components.Card.card>
 
-        <div class="space-y-4">
-          <BoonWeb.Components.Card.card
-            :for={purchase_order <- @work_package.purchase_orders}
-            id={"purchase-order-#{purchase_order.id}"}
-            variant="bordered"
-            color="warning"
-            rounded="extra_large"
-            class="app-panel"
-            padding="large"
-          >
-            <BoonWeb.Components.Card.card_content space="large">
-              <div class="grid gap-4 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
-                <div>
-                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p class="app-kicker text-[0.68rem]">Purchase Order</p>
-                      <h2 class="mt-3 text-2xl font-semibold text-stone-50">
-                        PO {purchase_order.po_number}
-                      </h2>
-                    </div>
+        <BoonWeb.Components.Card.card
+          variant="bordered"
+          color="warning"
+          rounded="extra_large"
+          class="app-panel"
+          padding="large"
+        >
+          <BoonWeb.Components.Card.card_content space="large">
+            <div class="space-y-2">
+              <p class="app-kicker text-[0.68rem]">Purchase Orders</p>
+              <h2 class="text-2xl font-semibold text-stone-50">Open a purchase order page</h2>
+              <p class="text-sm text-stone-400">
+                Click any row to open a dedicated purchase-order page with line-level detail and print actions.
+              </p>
+            </div>
 
-                    <div class="flex flex-wrap gap-3">
-                      <BoonWeb.Components.Button.button
-                        id={"print-purchase-order-pallet-tags-#{purchase_order.id}"}
-                        type="button"
-                        variant="outline"
-                        color="danger"
-                        icon="hero-document-duplicate"
-                        size="small"
-                        phx-click="print_purchase_order_pallet_tags"
-                        phx-value-purchase-order-id={purchase_order.id}
-                      >
-                        Print PO Pallet Tags
-                      </BoonWeb.Components.Button.button>
-
-                      <BoonWeb.Components.Button.button
-                        id={"print-purchase-order-labels-#{purchase_order.id}"}
-                        type="button"
-                        variant="outline"
-                        color="warning"
-                        icon="hero-printer"
-                        size="small"
-                        phx-click="print_purchase_order_labels"
-                        phx-value-purchase-order-id={purchase_order.id}
-                      >
-                        Print PO Labels
-                      </BoonWeb.Components.Button.button>
-                    </div>
-                  </div>
-
-                  <p :if={purchase_order.reference} class="mt-2 text-sm text-stone-400">
-                    {purchase_order.reference}
-                  </p>
-
-                  <div
-                    :if={purchase_order.ship_to}
-                    class="mt-4 rounded-[1.25rem] border border-white/10 bg-black/20 px-4 py-4"
-                  >
-                    <p class="text-xs uppercase tracking-[0.24em] text-stone-500">Ship To</p>
-                    <p class="mt-2 text-sm font-semibold text-stone-100">
-                      {ShippingLocation.label(purchase_order.ship_to)}
-                    </p>
-                    <p
-                      :for={line <- ShippingLocation.address_lines(purchase_order.ship_to)}
-                      class="text-sm text-stone-400"
-                    >
-                      {line}
-                    </p>
-                  </div>
-                </div>
-
-                <dl class="grid gap-3 sm:grid-cols-3">
-                  <div class="app-panel-soft rounded-[1.25rem] px-4 py-4">
-                    <dt class="text-xs uppercase tracking-[0.24em] text-stone-500">Order Date</dt>
-                    <dd class="mt-2 text-sm text-stone-100">
-                      {format_date(purchase_order.order_date)}
-                    </dd>
-                  </div>
-
-                  <div class="app-panel-soft rounded-[1.25rem] px-4 py-4">
-                    <dt class="text-xs uppercase tracking-[0.24em] text-stone-500">Revision Date</dt>
-                    <dd class="mt-2 text-sm text-stone-100">
-                      {format_date(purchase_order.revision_date)}
-                    </dd>
-                  </div>
-
-                  <div class="app-panel-soft rounded-[1.25rem] px-4 py-4">
-                    <dt class="text-xs uppercase tracking-[0.24em] text-stone-500">PO Lines</dt>
-                    <dd class="mt-2 text-sm text-stone-100">{length(purchase_order.lines)}</dd>
-                  </div>
-                </dl>
-              </div>
-
-              <BoonWeb.Components.Table.table
-                id={"purchase-order-lines-#{purchase_order.id}"}
-                rows={purchase_order.lines}
-                row_id={fn line -> "purchase-order-line-#{line.id}" end}
-                variant="base"
-                rounded="large"
-                class="text-stone-200"
-              >
-                <:col :let={line} label="Line">
-                  <span class="font-semibold text-stone-50">{line.line}</span>
-                </:col>
-                <:col :let={line} label="Item Number / Description">
-                  {line.item_number}
-                </:col>
-                <:col :let={line} label="Ship Date">
-                  <span class="text-stone-400">{format_date(line.ship_date)}</span>
-                </:col>
-                <:col :let={line} label="Quantity">
-                  {line.quantity}
-                </:col>
-                <:action :let={line}>
-                  <BoonWeb.Components.Button.button
-                    id={"print-line-labels-#{line.id}"}
-                    type="button"
-                    variant="ghost"
-                    color="warning"
-                    size="extra_small"
-                    icon="hero-printer"
-                    circle
-                    title={line_print_title(line)}
-                    aria-label={line_print_title(line)}
-                    phx-click="print_line_labels"
-                    phx-value-purchase-order-id={purchase_order.id}
-                    phx-value-line-id={line.id}
-                    disabled={!ItemNumber.label_item?(line.item_number)}
-                    class={
-                      if(!ItemNumber.label_item?(line.item_number),
-                        do: "cursor-not-allowed opacity-40"
-                      )
-                    }
-                  />
-                </:action>
-              </BoonWeb.Components.Table.table>
-            </BoonWeb.Components.Card.card_content>
-          </BoonWeb.Components.Card.card>
-        </div>
+            <BoonWeb.Components.Table.table
+              id="purchase-orders-table"
+              rows={@work_package.purchase_orders}
+              row_id={fn purchase_order -> "purchase-order-row-#{purchase_order.id}" end}
+              row_click={
+                fn purchase_order ->
+                  JS.navigate(
+                    ~p"/work-packages/#{@work_package.id}/purchase-orders/#{purchase_order.id}"
+                  )
+                end
+              }
+              variant="base_hoverable"
+              rounded="large"
+              class="text-stone-200"
+            >
+              <:col :let={purchase_order} label="PO Number">
+                <span class="font-semibold text-stone-50">PO {purchase_order.po_number}</span>
+              </:col>
+              <:col :let={purchase_order} label="Reference">
+                <span class="line-clamp-1 text-stone-400">{purchase_order.reference || "-"}</span>
+              </:col>
+              <:col :let={purchase_order} label="Ship To">
+                {ship_to_label(purchase_order.ship_to)}
+              </:col>
+              <:col :let={purchase_order} label="PO Lines">
+                {length(purchase_order.lines)}
+              </:col>
+              <:col :let={purchase_order} label="Revision">
+                <span class="text-stone-400">{format_date(purchase_order.revision_date)}</span>
+              </:col>
+            </BoonWeb.Components.Table.table>
+          </BoonWeb.Components.Card.card_content>
+        </BoonWeb.Components.Card.card>
       </section>
     </Layouts.app>
     """
@@ -423,14 +265,6 @@ defmodule BoonWeb.WorkPackageLive.Show do
     end
   end
 
-  defp find_purchase_order(work_package, purchase_order_id) do
-    Enum.find(work_package.purchase_orders, &(&1.id == purchase_order_id))
-  end
-
-  defp find_line(purchase_order, line_id) do
-    Enum.find(purchase_order.lines, &(&1.id == line_id))
-  end
-
   defp label_dispatch_options do
     printing_config = Application.get_env(:boon, :printing, [])
 
@@ -450,13 +284,8 @@ defmodule BoonWeb.WorkPackageLive.Show do
     ]
   end
 
-  defp line_print_title(line) do
-    if ItemNumber.label_item?(line.item_number) do
-      "Print labels for line #{line.line}"
-    else
-      "Labels are not printed for this line"
-    end
-  end
+  defp ship_to_label(nil), do: "-"
+  defp ship_to_label(ship_to), do: ShippingLocation.label(ship_to)
 
   defp format_date(%Date{} = date), do: Calendar.strftime(date, "%Y-%m-%d")
   defp format_date(_date), do: "-"

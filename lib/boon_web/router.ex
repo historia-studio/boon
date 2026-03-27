@@ -20,6 +20,10 @@ defmodule BoonWeb.Router do
     live "/", DashboardLive
     live "/intake", IntakeLive
     live "/work-packages", WorkPackageLive.Index
+
+    live "/work-packages/:work_package_id/purchase-orders/:purchase_order_id",
+         WorkPackageLive.PurchaseOrderShow
+
     live "/work-packages/:id", WorkPackageLive.Show
     live "/ship", ShipLive
   end

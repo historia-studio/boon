@@ -57,50 +57,29 @@ defmodule BoonWeb.WorkPackageShowLiveTest do
     conn: conn
   } do
     work_package = work_package_fixture()
-    [purchase_order] = work_package.purchase_orders
-    [tank_line, cabinet_line, lid_line] = purchase_order.lines
 
     {:ok, view, _html} = live(conn, ~p"/work-packages/#{work_package.id}")
 
     assert has_element?(view, "#print-work-package-labels")
-    assert has_element?(view, "#print-purchase-order-labels-#{purchase_order.id}")
-    assert has_element?(view, "#print-line-labels-#{tank_line.id}")
-    assert has_element?(view, "#print-line-labels-#{lid_line.id}")
-    assert has_element?(view, "#print-line-labels-#{cabinet_line.id}[disabled]")
+    assert has_element?(view, "#purchase-orders-table")
+    refute render(view) =~ "Purchase Order Detail"
 
     view
     |> element("#print-work-package-labels")
     |> render_click()
 
     assert_receive {:label_printed, "Label Maker", work_package_zpl}
-    assert work_package_zpl =~ tank_line.item_number
-    assert work_package_zpl =~ lid_line.item_number
+    assert work_package_zpl =~ "86-SA-T100"
+    assert work_package_zpl =~ "86-SA-L100"
     assert render(view) =~ "Printed 2 labels to Label Maker."
-
-    view
-    |> element("#print-purchase-order-labels-#{purchase_order.id}")
-    |> render_click()
-
-    assert_receive {:label_printed, "Label Maker", purchase_order_zpl}
-    assert purchase_order_zpl =~ tank_line.item_number
-    assert purchase_order_zpl =~ lid_line.item_number
-
-    view
-    |> element("#print-line-labels-#{tank_line.id}")
-    |> render_click()
-
-    assert_receive {:label_printed, "Label Maker", line_zpl}
-    assert line_zpl =~ tank_line.item_number
   end
 
-  test "work package screen prints pallet tags for work package and purchase order", %{conn: conn} do
+  test "work package screen prints pallet tags for the full work package", %{conn: conn} do
     work_package = work_package_fixture()
-    [purchase_order] = work_package.purchase_orders
 
     {:ok, view, _html} = live(conn, ~p"/work-packages/#{work_package.id}")
 
     assert has_element?(view, "#print-work-package-pallet-tags")
-    assert has_element?(view, "#print-purchase-order-pallet-tags-#{purchase_order.id}")
 
     view
     |> element("#print-work-package-pallet-tags")
@@ -109,13 +88,6 @@ defmodule BoonWeb.WorkPackageShowLiveTest do
     assert_receive {:pallet_tag_printed, "Chilliwack", work_package_pdf_path, "%PDF-1.4"}
     assert File.exists?(work_package_pdf_path)
     assert render(view) =~ "Printed 2 pallet tags to Chilliwack."
-
-    view
-    |> element("#print-purchase-order-pallet-tags-#{purchase_order.id}")
-    |> render_click()
-
-    assert_receive {:pallet_tag_printed, "Chilliwack", purchase_order_pdf_path, "%PDF-1.4"}
-    assert File.exists?(purchase_order_pdf_path)
   end
 
   test "operator can delete a work package from the detail screen", %{conn: conn} do
@@ -133,6 +105,24 @@ defmodule BoonWeb.WorkPackageShowLiveTest do
     refute Enum.any?(Operations.list_work_packages(), &(&1.id == work_package.id))
   end
 
+  test "operator can open a purchase order page from the table", %{conn: conn} do
+    work_package = multi_purchase_order_fixture()
+    [_first_purchase_order, second_purchase_order] = work_package.purchase_orders
+
+    {:ok, view, _html} = live(conn, ~p"/work-packages/#{work_package.id}")
+
+    assert has_element?(view, "#purchase-order-row-#{second_purchase_order.id}")
+
+    view
+    |> element("#purchase-order-row-#{second_purchase_order.id} td:first-child")
+    |> render_click()
+
+    assert_redirect(
+      view,
+      ~p"/work-packages/#{work_package.id}/purchase-orders/#{second_purchase_order.id}"
+    )
+  end
+
   defp work_package_fixture do
     {:ok, work_package} =
       Operations.create_work_package_entry(%{
@@ -148,6 +138,39 @@ defmodule BoonWeb.WorkPackageShowLiveTest do
               %{line: 1, item_number: "86-SA-T100", quantity: 1, ship_date: ~D[2026-04-10]},
               %{line: 2, item_number: "86-SA-C100", quantity: 1, ship_date: ~D[2026-04-10]},
               %{line: 3, item_number: "86-SA-L100", quantity: 1, ship_date: ~D[2026-04-10]}
+            ]
+          }
+        ]
+      })
+
+    Operations.get_work_package!(work_package.id)
+  end
+
+  defp multi_purchase_order_fixture do
+    {:ok, work_package} =
+      Operations.create_work_package_entry(%{
+        number: "WP-#{System.unique_integer([:positive])}",
+        purchase_orders: [
+          %{
+            po_number: "PO-#{System.unique_integer([:positive])}",
+            order_date: ~D[2026-03-20],
+            revision_date: ~D[2026-03-21],
+            reference: "TRANSFORMER, ANSI/IEEE GREEN, PRIORITY",
+            ship_to: "chilliwack",
+            lines: [
+              %{line: 1, item_number: "86-SA-T100", quantity: 1, ship_date: ~D[2026-04-10]},
+              %{line: 2, item_number: "86-SA-C100", quantity: 1, ship_date: ~D[2026-04-10]}
+            ]
+          },
+          %{
+            po_number: "PO-#{System.unique_integer([:positive])}",
+            order_date: ~D[2026-03-22],
+            revision_date: ~D[2026-03-23],
+            reference: "2M017553, 1730, 3 RAD, SEA FOAM, 84-1024300",
+            ship_to: "spruce_grove",
+            lines: [
+              %{line: 1, item_number: "86-SA-T200", quantity: 1, ship_date: ~D[2026-04-12]},
+              %{line: 2, item_number: "86-SA-C200", quantity: 1, ship_date: ~D[2026-04-12]}
             ]
           }
         ]
