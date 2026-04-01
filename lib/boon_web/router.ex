@@ -25,6 +25,8 @@ defmodule BoonWeb.Router do
          WorkPackageLive.PurchaseOrderShow
 
     live "/work-packages/:id", WorkPackageLive.Show
+    live "/shipments", ShipmentLive.Index
+    live "/shipments/:id", ShipmentLive.Show
     live "/ship", ShipLive
   end
 

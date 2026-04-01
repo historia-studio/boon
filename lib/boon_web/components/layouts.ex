@@ -80,6 +80,9 @@ defmodule BoonWeb.Layouts do
               <.link navigate={~p"/work-packages"} class="app-nav-link rounded-full px-4 py-2">
                 Work Packages
               </.link>
+              <.link navigate={~p"/shipments"} class="app-nav-link rounded-full px-4 py-2">
+                Shipments
+              </.link>
               <.link navigate={~p"/ship"} class="app-nav-link rounded-full px-4 py-2">Ship</.link>
             </nav>
 

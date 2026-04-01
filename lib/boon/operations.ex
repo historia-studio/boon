@@ -45,6 +45,20 @@ defmodule Boon.Operations do
     |> sort_purchase_order()
   end
 
+  def list_shipments do
+    Shipment
+    |> Ash.Query.sort(confirmed_at: :desc, inserted_at: :desc)
+    |> Ash.Query.load([:work_package, entries: :purchase_order])
+    |> Ash.read!()
+    |> Enum.map(&sort_shipment/1)
+  end
+
+  def get_shipment!(id) do
+    Shipment
+    |> Ash.get!(id, load: [:work_package, entries: :purchase_order])
+    |> sort_shipment()
+  end
+
   def save_work_package_entry(attrs) do
     Repo.transaction(fn ->
       with {:ok, work_package, work_package_notifications} <-
@@ -440,6 +454,12 @@ defmodule Boon.Operations do
   defp sort_purchase_order(purchase_order) do
     %{purchase_order | lines: Enum.sort_by(purchase_order.lines, & &1.line)}
   end
+
+  defp sort_shipment(shipment) do
+    %{shipment | entries: Enum.sort_by(shipment.entries, &shipment_entry_sort_key/1)}
+  end
+
+  defp shipment_entry_sort_key(entry), do: {entry.po_number, entry.pair_number, entry.pallet_type}
 
   defp fetch_first_entry([first_entry | _rest]), do: {:ok, first_entry}
 

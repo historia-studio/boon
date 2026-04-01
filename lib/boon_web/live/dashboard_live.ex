@@ -60,6 +60,14 @@ defmodule BoonWeb.DashboardLive do
                 >
                   Browse Records
                 </BoonWeb.Components.Button.button_link>
+                <BoonWeb.Components.Button.button_link
+                  navigate={~p"/shipments"}
+                  variant="subtle"
+                  color="warning"
+                  size="medium"
+                >
+                  Shipment History
+                </BoonWeb.Components.Button.button_link>
               </div>
             </div>
 

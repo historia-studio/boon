@@ -96,7 +96,11 @@ defmodule Boon.Printing.PackingSlipPdf do
       page_count > 1 && text_line(500, 754, 10, "Page #{page_number} of #{page_count}", "F1"),
       column_text_block(left_lines, 54, 700),
       column_text_block(right_lines, 320, 700),
-      column_text_block(["Shipment Date", format_date(Map.get(document, :shipment_date))], 54, 612),
+      column_text_block(
+        ["Shipment Date", format_date(Map.get(document, :shipment_date))],
+        54,
+        612
+      ),
       column_text_block(["Workpackage", Map.get(document, :work_package_number, "-")], 220, 612),
       column_text_block(["Ship Via", Map.get(document, :ship_via, "-")], 386, 612),
       "0.5 w 54 548 m 558 548 l S",

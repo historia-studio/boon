@@ -112,7 +112,8 @@ defmodule Boon.Printing.DispatcherTest do
 
       assert_receive {:pallet_tag_printed, "Chilliwack", pdf_path, "%PDF-1.4"}
       assert File.read!(pdf_path) =~ "(PACKING SLIP #{work_package.number}-1)"
-      assert File.read!(pdf_path) =~ "(Ship Via: Bremic)"
+      assert File.read!(pdf_path) =~ "(Ship Via)"
+      assert File.read!(pdf_path) =~ "(Bremic)"
       assert File.read!(pdf_path) =~ "(2M012345)"
 
       job = PrintJob |> Ash.read!() |> Enum.find(&(&1.document_type == "packing_slip"))
