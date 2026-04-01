@@ -7,6 +7,8 @@ defmodule Boon.Printing.PackingSlipPdf do
   @page_height 792
   @rows_per_page 22
   @title_font_size 32
+  @title_y 730
+  @address_block_y 680
 
   @spec render(map) :: binary
   def render(document) when is_map(document) do
@@ -92,10 +94,16 @@ defmodule Boon.Printing.PackingSlipPdf do
     right_lines = ["Ship To" | Map.get(document, :ship_to_lines, [])]
 
     commands = [
-      centered_text_line(Map.get(document, :title, "PACKING SLIP"), @title_font_size, 748, "F2"),
-      page_count > 1 && text_line(500, 754, 10, "Page #{page_number} of #{page_count}", "F1"),
-      column_text_block(left_lines, 54, 700),
-      column_text_block(right_lines, 320, 700),
+      centered_text_line(
+        Map.get(document, :title, "PACKING SLIP"),
+        @title_font_size,
+        @title_y,
+        "F2"
+      ),
+      page_count > 1 &&
+        text_line(500, @title_y + 6, 10, "Page #{page_number} of #{page_count}", "F1"),
+      column_text_block(left_lines, 54, @address_block_y),
+      column_text_block(right_lines, 320, @address_block_y),
       column_text_block(
         ["Shipment Date", format_date(Map.get(document, :shipment_date))],
         54,

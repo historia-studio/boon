@@ -43,6 +43,12 @@ defmodule BoonWeb.ShipmentShowLiveTest do
     {:ok, view, _html} = live(conn, ~p"/shipments/#{shipment.id}")
 
     assert has_element?(view, "#reprint-packing-slip")
+
+    assert has_element?(
+             view,
+             "#download-packing-slip[href='/shipments/#{shipment.id}/packing-slip']"
+           )
+
     assert has_element?(view, "#shipment-entries-table")
     assert has_element?(view, "#shipment-entry-#{hd(shipment.entries).id}")
 

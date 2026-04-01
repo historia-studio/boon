@@ -17,6 +17,8 @@ defmodule BoonWeb.Router do
   scope "/", BoonWeb do
     pipe_through :browser
 
+    get "/shipments/:id/packing-slip", ShipmentPackingSlipController, :show
+
     live "/", DashboardLive
     live "/intake", IntakeLive
     live "/work-packages", WorkPackageLive.Index

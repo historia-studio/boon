@@ -118,27 +118,55 @@ defmodule Boon.Printing.Dispatcher do
 
   @spec dispatch_shipment_packing_slip(map, keyword) :: {:ok, map}
   def dispatch_shipment_packing_slip(shipment, opts \\ []) do
-    shipment = Ash.load!(shipment, [:work_package, entries: :purchase_order])
-    shipment_index = shipment_sequence_number(shipment)
-
     result =
-      case PackingSlip.build(shipment, shipment_index) do
-        {:ok, packing_slip} ->
-          dispatch_packing_slip(shipment, packing_slip, shipment_index, opts)
+      case build_shipment_packing_slip_pdf(shipment) do
+        {:ok,
+         %{shipment: loaded_shipment, packing_slip: packing_slip, shipment_index: shipment_index}} ->
+          dispatch_packing_slip(loaded_shipment, packing_slip, shipment_index, opts)
 
-        {:error, error} ->
+        {:error, %{shipment: loaded_shipment, error: error}} ->
           create_failed_result(
             @packing_slip_document_type,
             nil,
-            shipment.work_package_id,
+            loaded_shipment.work_package_id,
             nil,
             nil,
             error,
-            shipment.entry_count
+            loaded_shipment.entry_count
           )
       end
 
     {:ok, result}
+  end
+
+  @spec build_shipment_packing_slip_pdf(map) ::
+          {:ok,
+           %{
+             shipment: map,
+             packing_slip: map,
+             shipment_index: pos_integer,
+             content: binary,
+             filename: String.t()
+           }}
+          | {:error, %{shipment: map, error: String.t()}}
+  def build_shipment_packing_slip_pdf(shipment) do
+    shipment = Ash.load!(shipment, [:work_package, entries: :purchase_order])
+    shipment_index = shipment_sequence_number(shipment)
+
+    case PackingSlip.build(shipment, shipment_index) do
+      {:ok, packing_slip} ->
+        {:ok,
+         %{
+           shipment: shipment,
+           packing_slip: packing_slip,
+           shipment_index: shipment_index,
+           content: PackingSlipPdf.render(packing_slip),
+           filename: packing_slip_filename(shipment.work_package.number, shipment_index)
+         }}
+
+      {:error, error} ->
+        {:error, %{shipment: shipment, error: error}}
+    end
   end
 
   defp dispatch_labels(work_package, opts) do
@@ -560,6 +588,13 @@ defmodule Boon.Printing.Dispatcher do
        |> Enum.join("-")) <> "-" <> Integer.to_string(timestamp) <> extension
 
     Path.join(temp_dir, filename)
+  end
+
+  defp packing_slip_filename(work_package_number, shipment_index) do
+    base =
+      sanitize_filename(["packing-slip", work_package_number, shipment_index] |> Enum.join("-"))
+
+    base <> ".pdf"
   end
 
   defp sanitize_filename(value) do

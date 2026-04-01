@@ -75,6 +75,17 @@ defmodule BoonWeb.ShipmentLive.Show do
                   Reprint Packing Slip
                 </BoonWeb.Components.Button.button>
                 <BoonWeb.Components.Button.button_link
+                  id="download-packing-slip"
+                  href={~p"/shipments/#{@shipment.id}/packing-slip"}
+                  variant="outline"
+                  color="warning"
+                  icon="hero-arrow-down-tray"
+                  size="medium"
+                  download
+                >
+                  Download PDF
+                </BoonWeb.Components.Button.button_link>
+                <BoonWeb.Components.Button.button_link
                   navigate={~p"/shipments"}
                   variant="outline"
                   color="warning"
