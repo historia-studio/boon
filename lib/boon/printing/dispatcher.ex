@@ -4,10 +4,13 @@ defmodule Boon.Printing.Dispatcher do
   """
 
   alias Boon.Operations
+  alias Boon.Operations.Shipment
 
   alias Boon.Printing.{
     LabelBatch,
     LabelTransport,
+    PackingSlip,
+    PackingSlipPdf,
     LabelZpl,
     PalletTagBatch,
     PalletTagPdf,
@@ -19,6 +22,7 @@ defmodule Boon.Printing.Dispatcher do
 
   @label_document_type "labels"
   @pallet_tag_document_type "pallet_tags"
+  @packing_slip_document_type "packing_slip"
 
   @spec dispatch_work_package(map, keyword) :: {:ok, map}
   def dispatch_work_package(work_package, opts \\ []) do
@@ -112,9 +116,73 @@ defmodule Boon.Printing.Dispatcher do
     {:ok, dispatch_pallet_tags_for_purchase_order(work_package, purchase_order, opts)}
   end
 
+  @spec dispatch_shipment_packing_slip(map, keyword) :: {:ok, map}
+  def dispatch_shipment_packing_slip(shipment, opts \\ []) do
+    shipment = Ash.load!(shipment, [:work_package, entries: :purchase_order])
+    shipment_index = shipment_sequence_number(shipment)
+
+    result =
+      case PackingSlip.build(shipment, shipment_index) do
+        {:ok, packing_slip} ->
+          dispatch_packing_slip(shipment, packing_slip, shipment_index, opts)
+
+        {:error, error} ->
+          create_failed_result(
+            @packing_slip_document_type,
+            nil,
+            shipment.work_package_id,
+            nil,
+            nil,
+            error,
+            shipment.entry_count
+          )
+      end
+
+    {:ok, result}
+  end
+
   defp dispatch_labels(work_package, opts) do
     {:ok, result} = dispatch_work_package_labels(work_package, opts)
     result
+  end
+
+  defp dispatch_packing_slip(shipment, packing_slip, shipment_index, opts) do
+    printer_name = ShippingLocation.pallet_tag_printer(packing_slip.ship_to)
+
+    case printer_name do
+      nil ->
+        create_failed_result(
+          @packing_slip_document_type,
+          nil,
+          shipment.work_package_id,
+          nil,
+          nil,
+          "No packing-slip printer is configured for ship-to #{packing_slip.ship_to || "unknown"}.",
+          shipment.entry_count
+        )
+
+      printer ->
+        payload_path =
+          build_payload_path(
+            opts,
+            ["packing-slip", shipment.work_package.number, shipment_index],
+            ".pdf"
+          )
+
+        transport = Keyword.get(opts, :packing_slip_transport, PalletTagTransport)
+        transport_opts = Keyword.get(opts, :packing_slip_transport_opts, [])
+
+        run_print_job(
+          @packing_slip_document_type,
+          printer,
+          shipment.work_package_id,
+          nil,
+          payload_path,
+          fn -> PackingSlipPdf.write(packing_slip, payload_path) end,
+          fn -> transport.print(printer, payload_path, transport_opts) end,
+          shipment.entry_count
+        )
+    end
   end
 
   defp dispatch_label_batch(
@@ -457,6 +525,30 @@ defmodule Boon.Printing.Dispatcher do
       })
     end)
   end
+
+  defp shipment_sequence_number(shipment) do
+    shipment
+    |> shipments_for_work_package()
+    |> Enum.sort_by(&shipment_sort_key/1)
+    |> Enum.find_index(&(&1.id == shipment.id))
+    |> case do
+      nil -> 1
+      index -> index + 1
+    end
+  end
+
+  defp shipments_for_work_package(shipment) do
+    Shipment
+    |> Ash.read!()
+    |> Enum.filter(&(&1.work_package_id == shipment.work_package_id))
+  end
+
+  defp shipment_sort_key(shipment) do
+    {timestamp_value(shipment.confirmed_at), timestamp_value(shipment.inserted_at), shipment.id}
+  end
+
+  defp timestamp_value(%DateTime{} = datetime), do: DateTime.to_unix(datetime, :microsecond)
+  defp timestamp_value(_other), do: 0
 
   defp build_payload_path(opts, parts, extension) when is_list(parts) do
     temp_dir = Keyword.get(opts, :temp_dir, System.tmp_dir!())

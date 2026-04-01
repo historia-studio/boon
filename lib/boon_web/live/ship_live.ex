@@ -2,6 +2,7 @@ defmodule BoonWeb.ShipLive do
   use BoonWeb, :live_view
 
   alias Boon.Operations
+  alias Boon.Printing.{Dispatcher, PalletTagTransport}
 
   @impl true
   def mount(params, _session, socket) do
@@ -39,16 +40,17 @@ defmodule BoonWeb.ShipLive do
            submitted_from: shipping_host()
          }) do
       {:ok, shipment} ->
+        {:ok, packing_slip_result} =
+          Dispatcher.dispatch_shipment_packing_slip(shipment, packing_slip_dispatch_options())
+
         {:noreply,
          socket
          |> assign(:staged_tokens, [])
          |> assign(:staged_tags, [])
          |> assign(:draft_errors, [])
          |> assign(:shipment_summary, Operations.shipment_draft_summary([]))
-         |> put_flash(
-           :info,
-           "Shipment #{shipment.id} confirmed with #{shipment.entry_count} pallet tags."
-         )
+         |> put_flash(:info, shipment_flash_message(shipment, packing_slip_result))
+         |> maybe_put_packing_slip_error(packing_slip_result)
          |> push_event("clear-shipment-draft", %{storageKey: socket.assigns.draft_storage_key})}
 
       {:error, errors} when is_list(errors) ->
@@ -296,6 +298,45 @@ defmodule BoonWeb.ShipLive do
     Application.get_env(:boon, :shipping, [])
     |> Keyword.get(:host, "BOON")
   end
+
+  defp packing_slip_dispatch_options do
+    printing_config = Application.get_env(:boon, :printing, [])
+
+    [
+      packing_slip_transport:
+        Keyword.get(
+          printing_config,
+          :packing_slip_transport_module,
+          Keyword.get(printing_config, :pallet_tag_transport_module, PalletTagTransport)
+        ),
+      packing_slip_transport_opts:
+        Keyword.get(
+          printing_config,
+          :packing_slip_transport_opts,
+          Keyword.get(printing_config, :pallet_tag_transport_opts, [])
+        )
+    ]
+  end
+
+  defp shipment_flash_message(shipment, %{status: :completed, target_printer: printer})
+       when is_binary(printer) do
+    "Shipment #{shipment.id} confirmed with #{shipment.entry_count} pallet tags. Printed packing slip to #{printer}."
+  end
+
+  defp shipment_flash_message(shipment, _packing_slip_result) do
+    "Shipment #{shipment.id} confirmed with #{shipment.entry_count} pallet tags."
+  end
+
+  defp maybe_put_packing_slip_error(socket, %{status: :failed, error: error})
+       when is_binary(error) do
+    put_flash(
+      socket,
+      :error,
+      "Packing slip printing failed after shipment confirmation: #{error}"
+    )
+  end
+
+  defp maybe_put_packing_slip_error(socket, _result), do: socket
 
   defp pallet_identity_label(tag) do
     "#{pallet_type_label(tag.pallet_type)} #{tag.pair_number}"

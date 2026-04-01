@@ -7,6 +7,35 @@ defmodule BoonWeb.ShipLiveTest do
   alias Boon.Operations.Shipment
   alias Boon.Shipping.PalletTagToken
 
+  defmodule PackingSlipTransportStub do
+    @behaviour Boon.Printing.PalletTagTransport
+
+    @impl true
+    def print(printer_name, pdf_path, opts) do
+      if notify = Keyword.get(opts, :notify) do
+        send(notify, {:packing_slip_printed, printer_name, File.read!(pdf_path)})
+      end
+
+      Keyword.get(opts, :result, :ok)
+    end
+  end
+
+  setup do
+    previous = Application.get_env(:boon, :printing, [])
+
+    Application.put_env(
+      :boon,
+      :printing,
+      Keyword.merge(previous,
+        packing_slip_transport_module: PackingSlipTransportStub,
+        packing_slip_transport_opts: [notify: self()]
+      )
+    )
+
+    on_exit(fn -> Application.put_env(:boon, :printing, previous) end)
+    :ok
+  end
+
   test "ship page stages a scanned pallet tag from the deep link and can confirm shipment", %{
     conn: conn
   } do
@@ -26,10 +55,47 @@ defmodule BoonWeb.ShipLiveTest do
     |> render_click()
 
     assert render(view) =~ "confirmed with 1 pallet tags"
+    assert render(view) =~ "Printed packing slip to Chilliwack"
+
+    assert_receive {:packing_slip_printed, "Chilliwack", pdf}
+    assert pdf =~ "(PACKING SLIP #{work_package.number}-1)"
 
     [shipment] = Ash.read!(Shipment)
     assert shipment.entry_count == 1
     assert shipment.submitted_from == "BOON"
+  end
+
+  test "shipment confirmation stays successful when packing slip printing fails", %{conn: conn} do
+    previous = Application.get_env(:boon, :printing, [])
+
+    Application.put_env(
+      :boon,
+      :printing,
+      Keyword.merge(previous,
+        packing_slip_transport_module: PackingSlipTransportStub,
+        packing_slip_transport_opts: [result: {:error, "Printer offline"}]
+      )
+    )
+
+    on_exit(fn -> Application.put_env(:boon, :printing, previous) end)
+
+    work_package = work_package_fixture()
+    [purchase_order] = work_package.purchase_orders
+
+    token = PalletTagToken.sign(work_package.id, purchase_order.id, 1, "tank")
+
+    {:ok, view, _html} = live(conn, ~p"/ship?tag=#{token}")
+
+    view
+    |> element("#submit-shipment")
+    |> render_click()
+
+    rendered = render(view)
+    assert rendered =~ "confirmed with 1 pallet tags"
+    assert rendered =~ "Packing slip printing failed after shipment confirmation: Printer offline"
+
+    [shipment] = Ash.read!(Shipment)
+    assert shipment.entry_count == 1
   end
 
   defp work_package_fixture do

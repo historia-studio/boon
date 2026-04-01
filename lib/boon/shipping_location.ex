@@ -9,6 +9,7 @@ defmodule Boon.ShippingLocation do
       recipient: "CAM TRAN CO LTD.",
       street: "8841 Charles St.",
       locality: "Chilliwack, BC V2P 7H9",
+      ship_via: "Bremic",
       printer_paper: "chilliwack",
       pallet_tag_printer: "Chilliwack",
       label_printer: "Label Maker"
@@ -18,6 +19,7 @@ defmodule Boon.ShippingLocation do
       recipient: "CAM TRAN CO LTD.",
       street: "31 Schram Street",
       locality: "Spruce Grove, AB T7X 0G6",
+      ship_via: "WTX",
       printer_paper: "spruce_grove",
       pallet_tag_printer: "Spruce Grove",
       label_printer: "Label Maker"
@@ -59,6 +61,10 @@ defmodule Boon.ShippingLocation do
   @spec printer_paper(value | nil) :: String.t() | nil
   def printer_paper(value) when is_binary(value), do: get_in(@locations, [value, :printer_paper])
   def printer_paper(_value), do: nil
+
+  @spec ship_via(value | nil) :: String.t() | nil
+  def ship_via(value) when is_binary(value), do: get_in(@locations, [value, :ship_via])
+  def ship_via(_value), do: nil
 
   @spec pallet_tag_printer(value | nil) :: String.t() | nil
   def pallet_tag_printer(value) when is_binary(value),
