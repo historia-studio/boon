@@ -13,6 +13,20 @@ defmodule BoonWeb.ShipmentLive.Index do
   end
 
   @impl true
+  def handle_event("delete_shipment", %{"id" => id}, socket) do
+    case Operations.delete_shipment(id) do
+      :ok ->
+        {:noreply,
+         socket
+         |> assign(:shipments, Operations.list_shipments())
+         |> put_flash(:info, "Shipment deleted.")}
+
+      {:error, [message | _rest]} ->
+        {:noreply, put_flash(socket, :error, message)}
+    end
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
@@ -95,14 +109,29 @@ defmodule BoonWeb.ShipmentLive.Index do
             </:col>
 
             <:action :let={shipment}>
-              <BoonWeb.Components.Button.button_link
-                navigate={~p"/shipments/#{shipment.id}"}
-                variant="subtle"
-                color="warning"
-                size="extra_small"
-              >
-                Open
-              </BoonWeb.Components.Button.button_link>
+              <div class="flex gap-2">
+                <BoonWeb.Components.Button.button_link
+                  navigate={~p"/shipments/#{shipment.id}"}
+                  variant="subtle"
+                  color="warning"
+                  size="extra_small"
+                >
+                  Open
+                </BoonWeb.Components.Button.button_link>
+
+                <BoonWeb.Components.Button.button
+                  id={"delete-shipment-#{shipment.id}"}
+                  type="button"
+                  variant="outline"
+                  color="danger"
+                  size="extra_small"
+                  icon="hero-trash"
+                  phx-click="delete_shipment"
+                  phx-value-id={shipment.id}
+                >
+                  Delete
+                </BoonWeb.Components.Button.button>
+              </div>
             </:action>
           </BoonWeb.Components.Table.table>
         </BoonWeb.Components.Card.card_content>

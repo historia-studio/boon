@@ -22,6 +22,22 @@ defmodule BoonWeb.ShipmentIndexLiveTest do
     assert_redirect(view, ~p"/shipments/#{second_shipment.id}")
   end
 
+  test "operator can delete a shipment from the index", %{conn: conn} do
+    shipment = shipment_fixture(~U[2026-04-01 12:00:00Z])
+
+    {:ok, view, _html} = live(conn, ~p"/shipments")
+
+    assert has_element?(view, "#delete-shipment-#{shipment.id}")
+
+    view
+    |> element("#delete-shipment-#{shipment.id}")
+    |> render_click()
+
+    assert render(view) =~ "Shipment deleted."
+    refute has_element?(view, "#shipment-#{shipment.id}")
+    refute Enum.any?(Operations.list_shipments(), &(&1.id == shipment.id))
+  end
+
   defp shipment_fixture(confirmed_at) do
     work_package = work_package_fixture()
     [purchase_order] = work_package.purchase_orders

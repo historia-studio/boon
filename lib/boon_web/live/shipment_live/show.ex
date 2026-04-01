@@ -29,6 +29,19 @@ defmodule BoonWeb.ShipmentLive.Show do
      )}
   end
 
+  def handle_event("delete_shipment", _params, socket) do
+    case Operations.delete_shipment(socket.assigns.shipment) do
+      :ok ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Shipment deleted.")
+         |> push_navigate(to: ~p"/shipments")}
+
+      {:error, [message | _rest]} ->
+        {:noreply, put_flash(socket, :error, message)}
+    end
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -101,6 +114,17 @@ defmodule BoonWeb.ShipmentLive.Show do
                 >
                   Open Work Package
                 </BoonWeb.Components.Button.button_link>
+                <BoonWeb.Components.Button.button
+                  id="delete-shipment"
+                  type="button"
+                  variant="outline"
+                  color="danger"
+                  icon="hero-trash"
+                  size="medium"
+                  phx-click="delete_shipment"
+                >
+                  Delete Shipment
+                </BoonWeb.Components.Button.button>
               </div>
             </div>
 

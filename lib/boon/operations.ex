@@ -115,6 +115,41 @@ defmodule Boon.Operations do
     end
   end
 
+  def delete_shipment(id) when is_binary(id) do
+    case Ash.get(Shipment, id, load: [entries: :purchase_order]) do
+      {:ok, nil} -> {:error, ["That shipment could not be found."]}
+      {:ok, shipment} -> delete_shipment(shipment)
+      {:error, error} -> {:error, [format_error(error)]}
+    end
+  end
+
+  def delete_shipment(%Shipment{} = shipment) do
+    Repo.transaction(fn ->
+      shipment = Ash.load!(shipment, entries: :purchase_order)
+
+      purchase_order_ids =
+        shipment.entries
+        |> Enum.map(& &1.purchase_order_id)
+        |> Enum.uniq()
+
+      with {:ok, destroy_notifications} <- destroy_resource(shipment),
+           {:ok, shipping_status_notifications} <-
+             sync_purchase_order_shipping_statuses(purchase_order_ids) do
+        destroy_notifications ++ shipping_status_notifications
+      else
+        {:error, error} -> Repo.rollback(error)
+      end
+    end)
+    |> case do
+      {:ok, notifications} ->
+        notify(notifications)
+        :ok
+
+      {:error, error} ->
+        {:error, [format_error(error)]}
+    end
+  end
+
   def update_purchase_order_entry(id, attrs) when is_binary(id) do
     case Ash.get(PurchaseOrder, id, load: [:lines, :work_package]) do
       {:ok, nil} -> {:error, ["That purchase order could not be found."]}
@@ -520,22 +555,41 @@ defmodule Boon.Operations do
     entries
     |> Enum.map(& &1.purchase_order_id)
     |> Enum.uniq()
-    |> Enum.reduce_while({:ok, []}, fn purchase_order_id, {:ok, updated_purchase_orders} ->
+    |> sync_purchase_order_shipping_statuses()
+  end
+
+  defp sync_purchase_order_shipping_statuses(purchase_order_ids) do
+    purchase_order_ids
+    |> Enum.reduce_while({:ok, []}, fn purchase_order_id, {:ok, notifications} ->
       purchase_order = PurchaseOrder |> Ash.get!(purchase_order_id, load: [:lines, :work_package])
 
-      if purchase_order_fully_shipped?(purchase_order) do
-        purchase_order
-        |> Ash.Changeset.for_update(:update, %{shipped_at: DateTime.utc_now()})
-        |> Ash.update()
-        |> case do
-          {:ok, updated_purchase_order} ->
-            {:cont, {:ok, [updated_purchase_order | updated_purchase_orders]}}
-
-          {:error, error} ->
-            {:halt, {:error, error}}
+      attrs =
+        if purchase_order_fully_shipped?(purchase_order) do
+          if is_nil(purchase_order.shipped_at) do
+            %{shipped_at: DateTime.utc_now()}
+          else
+            nil
+          end
+        else
+          if is_nil(purchase_order.shipped_at) do
+            nil
+          else
+            %{shipped_at: nil}
+          end
         end
-      else
-        {:cont, {:ok, updated_purchase_orders}}
+
+      case attrs do
+        nil ->
+          {:cont, {:ok, notifications}}
+
+        attrs ->
+          case update_resource(purchase_order, attrs) do
+            {:ok, _purchase_order, update_notifications} ->
+              {:cont, {:ok, notifications ++ update_notifications}}
+
+            {:error, error} ->
+              {:halt, {:error, error}}
+          end
       end
     end)
   end

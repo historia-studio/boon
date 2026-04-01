@@ -86,6 +86,21 @@ defmodule BoonWeb.ShipmentShowLiveTest do
     assert render(view) =~ "Packing slip reprint failed: Printer offline"
   end
 
+  test "shipment detail can delete the shipment", %{conn: conn} do
+    shipment = shipment_fixture()
+
+    {:ok, view, _html} = live(conn, ~p"/shipments/#{shipment.id}")
+
+    assert has_element?(view, "#delete-shipment")
+
+    view
+    |> element("#delete-shipment")
+    |> render_click()
+
+    assert_redirect(view, ~p"/shipments")
+    refute Enum.any?(Operations.list_shipments(), &(&1.id == shipment.id))
+  end
+
   defp shipment_fixture do
     work_package = work_package_fixture()
     [purchase_order] = work_package.purchase_orders
