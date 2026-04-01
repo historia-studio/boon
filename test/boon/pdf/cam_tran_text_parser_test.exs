@@ -50,7 +50,7 @@ defmodule Boon.PDF.CamTranTextParserTest do
     assert warnings == []
   end
 
-  test "prefers the lower repeated wrapped reference and stops before the footer disclaimer" do
+  test "extracts the reference from the top header location only" do
     text = """
     Purchase Order
     Purchase Order Number : 63130
@@ -88,7 +88,7 @@ defmodule Boon.PDF.CamTranTextParserTest do
              CamTranTextParser.parse(text)
 
     assert purchase_order.po_number == "63130"
-    assert purchase_order.reference == "2M017553, 1730, 3 RAD, SEA FOAM, 84-1024300"
+    assert purchase_order.reference == "2M017553, 1730, 3 RAD, SEA FOAM PS030, REV1"
     assert purchase_order.ship_to == "chilliwack"
     assert length(purchase_order.lines) == 4
     assert warnings == []
