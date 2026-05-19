@@ -9,11 +9,15 @@ defmodule BoonWeb.ShipLive do
     initial_token = Map.get(params, "tag")
 
     {initial_tokens, initial_errors} = initial_draft_state(initial_token)
+    po_filter = ""
 
     {:ok,
      socket
      |> assign(:current_scope, nil)
      |> assign(:draft_storage_key, draft_storage_key())
+     |> assign(:po_filter, po_filter)
+     |> assign(:po_filter_form, po_filter_form(po_filter))
+     |> assign(:available_tags, [])
      |> assign(:staged_tokens, initial_tokens)
      |> assign(:staged_tags, [])
      |> assign(:draft_errors, initial_errors)
@@ -23,7 +27,30 @@ defmodule BoonWeb.ShipLive do
 
   @impl true
   def handle_event("hydrate_shipment_draft", %{"tokens" => tokens}, socket) do
-    {:noreply, hydrate_draft(socket, normalize_tokens(tokens), [])}
+    {:noreply,
+     socket
+     |> hydrate_draft(normalize_tokens(tokens), [])
+     |> assign_available_tags(socket.assigns.po_filter)}
+  end
+
+  def handle_event("filter_available_tags", %{"filter" => %{"po_number" => po_number}}, socket) do
+    normalized_po_number = normalize_po_filter(po_number)
+
+    {:noreply,
+     socket
+     |> assign(:po_filter, normalized_po_number)
+     |> assign(:po_filter_form, po_filter_form(normalized_po_number))
+     |> assign_available_tags(normalized_po_number)}
+  end
+
+  def handle_event("add_staged_tag", %{"token" => token}, socket) do
+    next_tokens = normalize_tokens(socket.assigns.staged_tokens ++ [token])
+
+    {:noreply,
+     socket
+     |> hydrate_draft(next_tokens, [])
+     |> assign_available_tags(socket.assigns.po_filter)
+     |> push_event("sync-shipment-draft", %{tokens: next_tokens})}
   end
 
   def handle_event("remove_staged_tag", %{"token" => token}, socket) do
@@ -32,6 +59,7 @@ defmodule BoonWeb.ShipLive do
     {:noreply,
      socket
      |> hydrate_draft(remaining_tokens, [])
+     |> assign_available_tags(socket.assigns.po_filter)
      |> push_event("sync-shipment-draft", %{tokens: remaining_tokens})}
   end
 
@@ -49,6 +77,7 @@ defmodule BoonWeb.ShipLive do
          |> assign(:staged_tags, [])
          |> assign(:draft_errors, [])
          |> assign(:shipment_summary, Operations.shipment_draft_summary([]))
+         |> assign_available_tags(socket.assigns.po_filter)
          |> put_flash(:info, shipment_flash_message(shipment, packing_slip_result))
          |> maybe_put_packing_slip_error(packing_slip_result)
          |> push_event("clear-shipment-draft", %{storageKey: socket.assigns.draft_storage_key})}
@@ -153,6 +182,77 @@ defmodule BoonWeb.ShipLive do
             </div>
 
             <BoonWeb.Components.Card.card
+              variant="bordered"
+              color="warning"
+              rounded="large"
+              class="bg-black/15"
+              padding="medium"
+            >
+              <p class="app-kicker text-[0.68rem]">Add By PO</p>
+
+              <.form
+                for={@po_filter_form}
+                id="shipment-po-filter-form"
+                phx-change="filter_available_tags"
+              >
+                <.input
+                  field={@po_filter_form[:po_number]}
+                  type="text"
+                  label="PO number"
+                  placeholder="Search purchase orders"
+                  autocomplete="off"
+                />
+              </.form>
+
+              <div class="mt-4">
+                <div
+                  :if={@po_filter != "" and @available_tags == []}
+                  class="rounded-[1.5rem] border border-dashed border-white/10 px-4 py-6 text-sm text-stone-400"
+                >
+                  No available pallet tags match that PO number.
+                </div>
+
+                <div
+                  :if={@po_filter == ""}
+                  class="rounded-[1.5rem] border border-dashed border-white/10 px-4 py-6 text-sm text-stone-400"
+                >
+                  Enter a PO number to find pallet tags you can add manually.
+                </div>
+
+                <BoonWeb.Components.Table.table
+                  :if={@available_tags != []}
+                  id="available-tags-table"
+                  rows={@available_tags}
+                  row_id={&available_tag_row_id/1}
+                  row_click={
+                    fn tag -> JS.push("add_staged_tag", value: %{token: tag.pallet_tag_token}) end
+                  }
+                  variant="base_hoverable"
+                  rounded="large"
+                  class="text-stone-200"
+                >
+                  <:col :let={tag} label="PO Number">
+                    <span class="font-semibold text-stone-50">PO {tag.po_number}</span>
+                  </:col>
+
+                  <:col :let={tag} label="Work Package">
+                    <span class="text-stone-400">WP {tag.work_package_number}</span>
+                  </:col>
+
+                  <:col :let={tag} label="Pallet">
+                    <span class="text-stone-400">{pallet_identity_label(tag)}</span>
+                  </:col>
+
+                  <:col :let={tag} label="Tank / Cabinet">
+                    <span class="text-stone-400">
+                      {tag.tank_item_number} / {tag.cabinet_item_number}
+                    </span>
+                  </:col>
+                </BoonWeb.Components.Table.table>
+              </div>
+            </BoonWeb.Components.Card.card>
+
+            <BoonWeb.Components.Card.card
               :if={@draft_errors != []}
               variant="bordered"
               color="danger"
@@ -175,7 +275,7 @@ defmodule BoonWeb.ShipLive do
             >
               <p class="app-kicker text-[0.68rem]">Staged Pallet Tags</p>
 
-              <div class="mt-4 space-y-3">
+              <div class="mt-4">
                 <div
                   :if={@staged_tags == []}
                   class="rounded-[1.5rem] border border-dashed border-white/10 px-4 py-6 text-sm text-stone-400"
@@ -183,33 +283,44 @@ defmodule BoonWeb.ShipLive do
                   No pallet tags staged. Scan a QR or open this page with a tag query parameter.
                 </div>
 
-                <div
-                  :for={tag <- @staged_tags}
-                  id={"staged-tag-#{tag.pallet_tag_token}"}
-                  class="app-panel-soft flex flex-col gap-3 rounded-[1.25rem] px-4 py-4 md:flex-row md:items-center md:justify-between"
+                <BoonWeb.Components.Table.table
+                  :if={@staged_tags != []}
+                  id="staged-tags-table"
+                  rows={@staged_tags}
+                  row_id={&staged_tag_row_id/1}
+                  variant="base_hoverable"
+                  rounded="large"
+                  class="text-stone-200"
                 >
-                  <div>
-                    <p class="text-sm font-semibold text-stone-100">
+                  <:col :let={tag} label="Work Package / PO">
+                    <span class="font-semibold text-stone-50">
                       WP {tag.work_package_number} · PO {tag.po_number} · {pallet_identity_label(tag)}
-                    </p>
-                    <p class="mt-1 text-sm text-stone-400">
-                      Tank {tag.tank_item_number} / Cabinet {tag.cabinet_item_number}
-                    </p>
-                  </div>
+                    </span>
+                  </:col>
 
-                  <BoonWeb.Components.Button.button
-                    id={"remove-staged-tag-#{tag.pallet_tag_token}"}
-                    type="button"
-                    variant="ghost"
-                    color="warning"
-                    size="small"
-                    icon="hero-x-mark"
-                    phx-click="remove_staged_tag"
-                    phx-value-token={tag.pallet_tag_token}
-                  >
-                    Remove
-                  </BoonWeb.Components.Button.button>
-                </div>
+                  <:col :let={tag} label="Tank / Cabinet">
+                    <span class="text-stone-400">
+                      Tank {tag.tank_item_number} / Cabinet {tag.cabinet_item_number}
+                    </span>
+                  </:col>
+
+                  <:action :let={tag}>
+                    <BoonWeb.Components.Button.button
+                      id={remove_staged_tag_button_id(tag)}
+                      type="button"
+                      variant="shadow"
+                      color="warning"
+                      size="medium"
+                      icon="hero-x-mark"
+                      title="Remove pallet tag"
+                      aria-label="Remove pallet tag"
+                      phx-click="remove_staged_tag"
+                      phx-value-token={tag.pallet_tag_token}
+                    >
+                      Remove
+                    </BoonWeb.Components.Button.button>
+                  </:action>
+                </BoonWeb.Components.Table.table>
               </div>
             </BoonWeb.Components.Card.card>
 
@@ -280,6 +391,25 @@ defmodule BoonWeb.ShipLive do
     |> Enum.uniq()
   end
 
+  defp normalize_po_filter(po_number) do
+    po_number
+    |> to_string()
+    |> String.trim()
+  end
+
+  defp po_filter_form(po_number) do
+    to_form(%{"po_number" => po_number}, as: :filter)
+  end
+
+  defp assign_available_tags(socket, po_number) do
+    available_tags =
+      po_number
+      |> Operations.list_shipping_candidates_by_po()
+      |> Enum.reject(&(&1.pallet_tag_token in socket.assigns.staged_tokens))
+
+    assign(socket, :available_tags, available_tags)
+  end
+
   defp initial_draft_state(nil), do: {[], []}
 
   defp initial_draft_state(initial_token) do
@@ -340,6 +470,18 @@ defmodule BoonWeb.ShipLive do
 
   defp pallet_identity_label(tag) do
     "#{pallet_type_label(tag.pallet_type)} #{tag.pair_number}"
+  end
+
+  defp available_tag_row_id(tag) do
+    "available-tag-#{tag.purchase_order_id}-#{tag.pair_number}-#{tag.pallet_type}"
+  end
+
+  defp staged_tag_row_id(tag) do
+    "staged-tag-#{tag.purchase_order_id}-#{tag.pair_number}-#{tag.pallet_type}"
+  end
+
+  defp remove_staged_tag_button_id(tag) do
+    "remove-staged-tag-#{tag.purchase_order_id}-#{tag.pair_number}-#{tag.pallet_type}"
   end
 
   defp pallet_type_label("tank"), do: "Tank"

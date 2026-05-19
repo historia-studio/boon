@@ -45,6 +45,24 @@ defmodule Boon.Operations do
     |> sort_purchase_order()
   end
 
+  def list_shipping_candidates_by_po(po_number_query) when is_binary(po_number_query) do
+    normalized_query = normalize_shipping_candidate_query(po_number_query)
+
+    if normalized_query == "" do
+      []
+    else
+      shipped_keys = shipped_shipping_candidate_keys()
+
+      list_work_packages()
+      |> Enum.flat_map(fn work_package ->
+        work_package.purchase_orders
+        |> Enum.filter(&purchase_order_matches_query?(&1, normalized_query))
+        |> Enum.flat_map(&shipping_candidates_from_purchase_order(work_package, &1, shipped_keys))
+      end)
+      |> Enum.sort_by(&{&1.po_number, &1.pair_number, &1.pallet_type})
+    end
+  end
+
   def list_shipments do
     Shipment
     |> Ash.Query.sort(confirmed_at: :desc, inserted_at: :desc)
@@ -500,6 +518,53 @@ defmodule Boon.Operations do
 
   defp fetch_first_entry([]),
     do: {:error, "A shipment must contain at least one scanned pallet tag."}
+
+  defp shipped_shipping_candidate_keys do
+    from(entry in "shipment_entries",
+      select: {entry.purchase_order_id, entry.pair_number, entry.pallet_type}
+    )
+    |> Repo.all()
+    |> MapSet.new()
+  end
+
+  defp purchase_order_matches_query?(purchase_order, normalized_query) do
+    purchase_order.po_number
+    |> to_string()
+    |> String.upcase()
+    |> String.contains?(normalized_query)
+  end
+
+  defp shipping_candidates_from_purchase_order(work_package, purchase_order, shipped_keys) do
+    case PalletTagBatch.derive_purchase_order(purchase_order, work_package.number) do
+      {:ok, tags} ->
+        tags
+        |> Enum.reject(fn tag ->
+          MapSet.member?(shipped_keys, {purchase_order.id, tag.pair_number, tag.pallet_type})
+        end)
+        |> Enum.map(fn tag ->
+          Map.merge(tag, %{
+            work_package_id: work_package.id,
+            purchase_order_id: purchase_order.id,
+            pallet_tag_token:
+              PalletTagToken.sign(
+                work_package.id,
+                purchase_order.id,
+                tag.pair_number,
+                tag.pallet_type
+              )
+          })
+        end)
+
+      {:error, _error} ->
+        []
+    end
+  end
+
+  defp normalize_shipping_candidate_query(po_number_query) do
+    po_number_query
+    |> String.trim()
+    |> String.upcase()
+  end
 
   defp shipment_entries_from_tags(tags) do
     work_package_ids = tags |> Enum.map(& &1.work_package_id) |> Enum.uniq()

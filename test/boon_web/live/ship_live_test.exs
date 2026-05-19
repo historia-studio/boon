@@ -65,6 +65,36 @@ defmodule BoonWeb.ShipLiveTest do
     assert shipment.submitted_from == "BOON"
   end
 
+  test "ship page can manually filter, add, and remove pallet tags by PO number", %{conn: conn} do
+    work_package = work_package_fixture()
+    [purchase_order] = work_package.purchase_orders
+    staged_row_selector = "#available-tag-#{purchase_order.id}-1-cabinet td:nth-child(1)"
+
+    {:ok, view, _html} = live(conn, ~p"/ship")
+
+    view
+    |> element("#shipment-po-filter-form")
+    |> render_change(%{"filter" => %{"po_number" => purchase_order.po_number}})
+
+    filtered_html = render(view)
+    assert filtered_html =~ purchase_order.po_number
+    assert filtered_html =~ "available-tags-table"
+
+    view
+    |> element(staged_row_selector)
+    |> render_click()
+
+    assert has_element?(view, "#staged-tags-table")
+    assert has_element?(view, "#submit-shipment:not([disabled])")
+
+    view
+    |> element("#remove-staged-tag-#{purchase_order.id}-1-cabinet")
+    |> render_click()
+
+    refute has_element?(view, "#staged-tags-table")
+    assert has_element?(view, "#submit-shipment[disabled]")
+  end
+
   test "shipment confirmation stays successful when packing slip printing fails", %{conn: conn} do
     previous = Application.get_env(:boon, :printing, [])
 
