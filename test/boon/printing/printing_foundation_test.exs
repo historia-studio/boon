@@ -83,10 +83,10 @@ defmodule Boon.Printing.PrintingFoundationTest do
       assert Enum.map(tags, & &1.pallet_type) == ["bundle", "bundle"]
     end
 
-    test "returns an error when tank and cabinet quantities do not match" do
+    test "pairs bundled references and leaves extra tanks as singles" do
       purchase_order = %{
         po_number: "PO-201",
-        reference: "TRANSFORMER, ANSI/IEEE GREEN, PRIORITY",
+        reference: "TRANSFORMER 1480, ANSI/IEEE GREEN, PRIORITY",
         ship_to: "spruce_grove",
         lines: [
           %{line: 1, item_number: "86-SA-T100", quantity: 2},
@@ -94,8 +94,55 @@ defmodule Boon.Printing.PrintingFoundationTest do
         ]
       }
 
-      assert {:error, message} = PalletTagBatch.derive_purchase_order(purchase_order, "WP-201")
-      assert message =~ "cannot be paired deterministically"
+      assert {:ok, tags} = PalletTagBatch.derive_purchase_order(purchase_order, "WP-201")
+      assert length(tags) == 2
+
+      assert Enum.map(tags, &{&1.pair_number, &1.pallet_type}) == [{1, "bundle"}, {2, "tank"}]
+
+      assert Enum.map(tags, &{&1.tank_item_number, &1.cabinet_item_number}) == [
+               {"86-SA-T100", "86-SA-C100"},
+               {"86-SA-T100", ""}
+             ]
+    end
+
+    test "pairs non-bundled references and leaves extra cabinets as singles" do
+      purchase_order = %{
+        po_number: "PO-202",
+        reference: "TRANSFORMER, ANSI/IEEE GREEN, PRIORITY",
+        ship_to: "spruce_grove",
+        lines: [
+          %{line: 1, item_number: "86-SA-T100", quantity: 1},
+          %{line: 2, item_number: "86-SA-C100", quantity: 2}
+        ]
+      }
+
+      assert {:ok, tags} = PalletTagBatch.derive_purchase_order(purchase_order, "WP-202")
+
+      assert Enum.map(tags, &{&1.pair_number, &1.pallet_type}) == [
+               {1, "tank"},
+               {1, "cabinet"},
+               {2, "cabinet"}
+             ]
+
+      assert Enum.map(tags, &{&1.tank_item_number, &1.cabinet_item_number}) == [
+               {"86-SA-T100", "86-SA-C100"},
+               {"86-SA-T100", "86-SA-C100"},
+               {"", "86-SA-C100"}
+             ]
+    end
+
+    test "returns an error when no tank or cabinet pallet-tag lines exist" do
+      purchase_order = %{
+        po_number: "PO-203",
+        reference: "TRANSFORMER, ANSI/IEEE GREEN, PRIORITY",
+        ship_to: "spruce_grove",
+        lines: [
+          %{line: 1, item_number: "86-SA-L100", quantity: 1}
+        ]
+      }
+
+      assert {:error, message} = PalletTagBatch.derive_purchase_order(purchase_order, "WP-203")
+      assert message =~ "does not contain any tank or cabinet lines"
     end
   end
 

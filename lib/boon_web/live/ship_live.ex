@@ -243,10 +243,8 @@ defmodule BoonWeb.ShipLive do
                     <span class="text-stone-400">{pallet_identity_label(tag)}</span>
                   </:col>
 
-                  <:col :let={tag} label="Tank / Cabinet">
-                    <span class="text-stone-400">
-                      {tag.tank_item_number} / {tag.cabinet_item_number}
-                    </span>
+                  <:col :let={tag} label="Items">
+                    <span class="text-stone-400">{pallet_item_label(tag)}</span>
                   </:col>
                 </BoonWeb.Components.Table.table>
               </div>
@@ -298,10 +296,8 @@ defmodule BoonWeb.ShipLive do
                     </span>
                   </:col>
 
-                  <:col :let={tag} label="Tank / Cabinet">
-                    <span class="text-stone-400">
-                      Tank {tag.tank_item_number} / Cabinet {tag.cabinet_item_number}
-                    </span>
+                  <:col :let={tag} label="Items">
+                    <span class="text-stone-400">{pallet_item_label(tag)}</span>
                   </:col>
 
                   <:action :let={tag}>
@@ -471,6 +467,18 @@ defmodule BoonWeb.ShipLive do
   defp pallet_identity_label(tag) do
     "#{pallet_type_label(tag.pallet_type)} #{tag.pair_number}"
   end
+
+  defp pallet_item_label(tag) do
+    [
+      present_item_label("Tank", tag.tank_item_number),
+      present_item_label("Cabinet", tag.cabinet_item_number)
+    ]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.join(" / ")
+  end
+
+  defp present_item_label(_label, item_number) when item_number in [nil, ""], do: nil
+  defp present_item_label(label, item_number), do: "#{label} #{item_number}"
 
   defp available_tag_row_id(tag) do
     "available-tag-#{tag.purchase_order_id}-#{tag.pair_number}-#{tag.pallet_type}"
