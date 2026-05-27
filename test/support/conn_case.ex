@@ -16,6 +16,7 @@ defmodule BoonWeb.ConnCase do
   """
 
   use ExUnit.CaseTemplate
+  import AshAuthentication.Phoenix.Plug, only: [store_in_session: 2]
 
   using do
     quote do
@@ -33,6 +34,38 @@ defmodule BoonWeb.ConnCase do
 
   setup tags do
     Boon.DataCase.setup_sandbox(tags)
-    {:ok, conn: Phoenix.ConnTest.build_conn()}
+
+    conn = Phoenix.ConnTest.build_conn()
+
+    if Map.get(tags, :authenticate, true) do
+      {:ok, register_and_log_in_user(%{conn: conn})}
+    else
+      {:ok, conn: conn, current_user: nil}
+    end
+  end
+
+  def register_and_log_in_user(%{conn: conn} = context) do
+    username = "test-#{System.unique_integer([:positive])}"
+    password = "password123!"
+    strategy = AshAuthentication.Info.strategy!(Boon.Accounts.User, :password)
+
+    Boon.Accounts.ensure_user!(username, password)
+
+    {:ok, authenticated_user} =
+      AshAuthentication.Strategy.Password.Actions.sign_in(
+        strategy,
+        %{"username" => username, "password" => password},
+        []
+      )
+
+    conn =
+      conn
+      |> Phoenix.ConnTest.init_test_session(%{})
+      |> store_in_session(authenticated_user)
+      |> Plug.Conn.assign(:current_user, authenticated_user)
+
+    context
+    |> Map.put(:conn, conn)
+    |> Map.put(:current_user, authenticated_user)
   end
 end

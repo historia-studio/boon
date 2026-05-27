@@ -9,7 +9,7 @@ import Config
 
 config :boon,
   ecto_repos: [Boon.Repo],
-  ash_domains: [Boon.Operations],
+  ash_domains: [Boon.Operations, Boon.Accounts],
   generators: [timestamp_type: :utc_datetime],
   pdf_intake_parser: Boon.PDF.HostParser,
   shipping: [

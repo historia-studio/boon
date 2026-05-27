@@ -1,0 +1,49 @@
+defmodule BoonWeb.LiveUserAuth do
+  @moduledoc """
+  Helpers for authenticating users in LiveViews.
+  """
+
+  import Phoenix.Component
+  use BoonWeb, :verified_routes
+
+  def generate_authenticated_session(conn) do
+    conn
+    |> AshAuthentication.Phoenix.LiveSession.generate_session()
+    |> maybe_put_raw_auth_session(conn, :user)
+  end
+
+  def on_mount(:current_user, _params, session, socket) do
+    {:cont, AshAuthentication.Phoenix.LiveSession.assign_new_resources(socket, session)}
+  end
+
+  def on_mount(:live_user_optional, _params, _session, socket) do
+    if socket.assigns[:current_user] do
+      {:cont, socket}
+    else
+      {:cont, assign(socket, :current_user, nil)}
+    end
+  end
+
+  def on_mount(:live_user_required, _params, _session, socket) do
+    if socket.assigns[:current_user] do
+      {:cont, socket}
+    else
+      {:halt, Phoenix.LiveView.redirect(socket, to: ~p"/sign-in")}
+    end
+  end
+
+  def on_mount(:live_no_user, _params, _session, socket) do
+    if socket.assigns[:current_user] do
+      {:halt, Phoenix.LiveView.redirect(socket, to: ~p"/")}
+    else
+      {:cont, assign(socket, :current_user, nil)}
+    end
+  end
+
+  defp maybe_put_raw_auth_session(session, conn, key) do
+    case Plug.Conn.get_session(conn, key) do
+      value when is_binary(value) -> Map.put(session, Atom.to_string(key), value)
+      _ -> session
+    end
+  end
+end

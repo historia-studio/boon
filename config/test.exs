@@ -20,6 +20,10 @@ config :boon, BoonWeb.Endpoint,
   secret_key_base: "hxEuVXOrinBgrEEoC+tc4TJjfTZyJPQ6fL9n6mF58NsqEUEBtfmQYakQXY13mbwS",
   server: false
 
+config :boon,
+       :token_signing_secret,
+       "hxEuVXOrinBgrEEoC+tc4TJjfTZyJPQ6fL9n6mF58NsqEUEBtfmQYakQXY13mbwS"
+
 # In test we don't send emails
 config :boon, Boon.Mailer, adapter: Swoosh.Adapters.Test
 

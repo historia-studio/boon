@@ -163,7 +163,7 @@ defmodule BoonWeb.WorkPackageLive.PurchaseOrderShow do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope}>
+    <Layouts.app flash={@flash} current_scope={@current_scope} current_user={@current_user}>
       <section class="space-y-6">
         <div class="grid gap-4 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
           <div>

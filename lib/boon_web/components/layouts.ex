@@ -31,6 +31,10 @@ defmodule BoonWeb.Layouts do
     default: nil,
     doc: "the current [scope](https://hexdocs.pm/phoenix/scopes.html)"
 
+  attr :current_user, :map,
+    default: nil,
+    doc: "the currently authenticated user"
+
   slot :inner_block, required: true
 
   def app(assigns) do
@@ -85,6 +89,18 @@ defmodule BoonWeb.Layouts do
               </.link>
               <.link navigate={~p"/ship"} class="app-nav-link rounded-full px-4 py-2">Ship</.link>
             </nav>
+
+            <%= if @current_user do %>
+              <div class="flex items-center gap-3 self-start rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-stone-300 lg:self-auto">
+                <span class="max-w-44 truncate">{@current_user.username}</span>
+                <.link
+                  href={~p"/sign-out"}
+                  class="rounded-full border border-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-stone-200 transition hover:border-red-300/30 hover:bg-red-400/10 hover:text-red-100"
+                >
+                  Sign Out
+                </.link>
+              </div>
+            <% end %>
 
             <BoonWeb.Components.Button.button_link
               navigate={~p"/intake"}

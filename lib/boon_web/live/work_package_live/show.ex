@@ -54,7 +54,7 @@ defmodule BoonWeb.WorkPackageLive.Show do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope}>
+    <Layouts.app flash={@flash} current_scope={@current_scope} current_user={@current_user}>
       <section class="space-y-6">
         <BoonWeb.Components.Card.card
           variant="gradient"

@@ -10,6 +10,7 @@ defmodule Boon.Application do
     children = [
       BoonWeb.Telemetry,
       Boon.Repo,
+      {AshAuthentication.Supervisor, otp_app: :boon},
       {DNSCluster, query: Application.get_env(:boon, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Boon.PubSub},
       # Start a worker by calling: Boon.Worker.start_link(arg)

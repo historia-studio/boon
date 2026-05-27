@@ -30,6 +30,10 @@ config :boon, BoonWeb.Endpoint,
     tailwind: {Tailwind, :install_and_run, [:boon, ~w(--watch)]}
   ]
 
+config :boon,
+       :token_signing_secret,
+       "mdnOB/6kwiPMrLKUAN+7uNiM2oY9Zr2Lvj3qhe5jEIfdlUtsZpX+vef4hVxntacg"
+
 # ## SSL Support
 #
 # In order to use HTTPS in development, a self-signed

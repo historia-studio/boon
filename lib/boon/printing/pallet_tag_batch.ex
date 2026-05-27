@@ -83,7 +83,9 @@ defmodule Boon.Printing.PalletTagBatch do
     leftover_tanks = Enum.drop(tanks, pair_count)
     leftover_cabinets = Enum.drop(cabinets, pair_count)
 
-    Enum.zip_with(paired_tanks, paired_cabinets, fn tank, cabinet -> %{tank: tank, cabinet: cabinet} end) ++
+    Enum.zip_with(paired_tanks, paired_cabinets, fn tank, cabinet ->
+      %{tank: tank, cabinet: cabinet}
+    end) ++
       Enum.map(leftover_tanks, &%{tank: &1, cabinet: nil}) ++
       Enum.map(leftover_cabinets, &%{tank: nil, cabinet: &1})
   end

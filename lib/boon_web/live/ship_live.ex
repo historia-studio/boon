@@ -93,7 +93,7 @@ defmodule BoonWeb.ShipLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope}>
+    <Layouts.app flash={@flash} current_scope={@current_scope} current_user={@current_user}>
       <section>
         <BoonWeb.Components.Card.card
           variant="gradient"
