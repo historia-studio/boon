@@ -1,0 +1,7 @@
+tunnel: 823e2835-f31a-47e3-8da8-56d2716fffa0
+credentials-file: C:/Users/jesse/.cloudflared/823e2835-f31a-47e3-8da8-56d2716fffa0.json
+
+ingress:
+  - hostname: boon.historia.studio
+    service: http://localhost:4000
+  - service: http_status:404
