@@ -1,7 +1,7 @@
 import Config
 
-public_host = System.get_env("PHX_PUBLIC_HOST") || "BOON"
-public_scheme = System.get_env("PHX_PUBLIC_SCHEME") || "http"
+public_host = System.get_env("PHX_PUBLIC_HOST") || "boon.historia.studio"
+public_scheme = System.get_env("PHX_PUBLIC_SCHEME") || "https"
 
 public_port =
   case System.get_env("PHX_PUBLIC_PORT") do

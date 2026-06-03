@@ -54,7 +54,7 @@ if config_env() == :prod do
 
   config :boon, :token_signing_secret, secret_key_base
 
-  host = System.get_env("PHX_HOST") || "example.com"
+  host = System.get_env("PHX_HOST") || "boon.historia.studio"
 
   config :boon, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
