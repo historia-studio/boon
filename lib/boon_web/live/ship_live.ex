@@ -457,6 +457,9 @@ defmodule BoonWeb.ShipLive do
                   this.lastScannedAt = 0
                   this.scanning = false
                   this.detector = null
+                  this.decoder = null
+                  this.canvas = document.createElement("canvas")
+                  this.canvasContext = this.canvas.getContext("2d", {willReadFrequently: true})
 
                   this.startScanner = this.startScanner.bind(this)
                   this.stopScanner = this.stopScanner.bind(this)
@@ -469,18 +472,21 @@ defmodule BoonWeb.ShipLive do
                     return
                   }
 
-                  if (!("BarcodeDetector" in window)) {
-                    this.disableStart(
-                      "In-app QR scanning is unavailable in this browser. Open the tag URL directly or use a supported mobile browser."
-                    )
-                    return
+                  if ("BarcodeDetector" in window) {
+                    try {
+                      this.detector = new window.BarcodeDetector({formats: ["qr_code"]})
+                    } catch (_error) {
+                      this.detector = null
+                    }
                   }
 
-                  try {
-                    this.detector = new window.BarcodeDetector({formats: ["qr_code"]})
-                  } catch (_error) {
+                  if (typeof window.jsQR === "function") {
+                    this.decoder = window.jsQR
+                  }
+
+                  if (!this.detector && !this.decoder) {
                     this.disableStart(
-                      "This browser cannot start the QR detector. Open the tag URL directly or use a supported mobile browser."
+                      "In-app QR scanning is unavailable in this browser. Open the tag URL directly or use a supported mobile browser."
                     )
                   }
                 },
@@ -498,7 +504,7 @@ defmodule BoonWeb.ShipLive do
                 },
 
                 async startScanner() {
-                  if (this.scanning || !this.detector) {
+                  if (this.scanning || (!this.detector && !this.decoder)) {
                     return
                   }
 
@@ -566,21 +572,22 @@ defmodule BoonWeb.ShipLive do
                 },
 
                 async scanFrame() {
-                  if (!this.scanning || !this.detector || !this.video || this.video.readyState < 2) {
+                  if (!this.scanning || !this.video || this.video.readyState < 2) {
                     this.scheduleNextScan()
                     return
                   }
 
                   try {
-                    const codes = await this.detector.detect(this.video)
-                    const match = codes.find(code => typeof code.rawValue === "string" && code.rawValue.trim() !== "")
+                    const rawValue = this.detector
+                      ? await this.detectWithBarcodeDetector()
+                      : this.detectWithJsQr()
 
-                    if (match && this.shouldAcceptScan(match.rawValue)) {
-                      this.lastScannedValue = match.rawValue
+                    if (rawValue && this.shouldAcceptScan(rawValue)) {
+                      this.lastScannedValue = rawValue
                       this.lastScannedAt = Date.now()
                       this.setStatus("Pallet tag detected. Adding it to the shipment draft...")
 
-                      this.pushEvent("scan_pallet_tag", {payload: match.rawValue}, () => {
+                      this.pushEvent("scan_pallet_tag", {payload: rawValue}, () => {
                         this.setStatus("Pallet tag scanned. Keep scanning or stop the camera.")
                       })
 
@@ -591,6 +598,36 @@ defmodule BoonWeb.ShipLive do
                   }
 
                   this.scheduleNextScan()
+                },
+
+                async detectWithBarcodeDetector() {
+                  const codes = await this.detector.detect(this.video)
+                  const match = codes.find(code => typeof code.rawValue === "string" && code.rawValue.trim() !== "")
+                  return match ? match.rawValue : null
+                },
+
+                detectWithJsQr() {
+                  if (!this.decoder || !this.canvasContext) {
+                    return null
+                  }
+
+                  const width = this.video.videoWidth
+                  const height = this.video.videoHeight
+
+                  if (!width || !height) {
+                    return null
+                  }
+
+                  this.canvas.width = width
+                  this.canvas.height = height
+                  this.canvasContext.drawImage(this.video, 0, 0, width, height)
+
+                  const imageData = this.canvasContext.getImageData(0, 0, width, height)
+                  const code = this.decoder(imageData.data, width, height, {
+                    inversionAttempts: "dontInvert"
+                  })
+
+                  return code && typeof code.data === "string" && code.data.trim() !== "" ? code.data : null
                 },
 
                 setStatus(message) {
