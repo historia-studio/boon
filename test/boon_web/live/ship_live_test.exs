@@ -62,7 +62,23 @@ defmodule BoonWeb.ShipLiveTest do
 
     [shipment] = Ash.read!(Shipment)
     assert shipment.entry_count == 1
-    assert shipment.submitted_from == "BOON"
+    assert shipment.submitted_from == "boon.historia.studio"
+  end
+
+  test "ship page accepts a legacy BOON link through the scanner hook", %{conn: conn} do
+    work_package = work_package_fixture()
+    [purchase_order] = work_package.purchase_orders
+    token = PalletTagToken.sign(work_package.id, purchase_order.id, 1, "tank")
+
+    {:ok, view, _html} = live(conn, ~p"/ship")
+
+    legacy_url = "http://BOON:4000/ship?tag=#{URI.encode_www_form(token)}"
+
+    rendered = render_hook(view, "scan_pallet_tag", %{"payload" => legacy_url})
+
+    assert rendered =~ purchase_order.po_number
+    assert rendered =~ "Tank 1"
+    assert has_element?(view, "#staged-tags-table")
   end
 
   test "ship page can manually filter, add, and remove pallet tags by PO number", %{conn: conn} do

@@ -53,6 +53,23 @@ defmodule BoonWeb.ShipLive do
      |> push_event("sync-shipment-draft", %{tokens: next_tokens})}
   end
 
+  def handle_event("scan_pallet_tag", %{"payload" => payload}, socket) do
+    case scanned_token_from_payload(payload) do
+      {:ok, token} ->
+        next_tokens = normalize_tokens(socket.assigns.staged_tokens ++ [token])
+
+        {:noreply,
+         socket
+         |> hydrate_draft(next_tokens, [])
+         |> assign_available_tags(socket.assigns.po_filter)
+         |> push_event("sync-shipment-draft", %{tokens: next_tokens})}
+
+      {:error, error} ->
+        {:noreply,
+         assign(socket, :draft_errors, Enum.uniq([error | socket.assigns.draft_errors]))}
+    end
+  end
+
   def handle_event("remove_staged_tag", %{"token" => token}, socket) do
     remaining_tokens = Enum.reject(socket.assigns.staged_tokens, &(&1 == token))
 
@@ -123,7 +140,7 @@ defmodule BoonWeb.ShipLive do
               <h1 class="text-3xl font-semibold text-stone-50">Scan and ship</h1>
             </div>
 
-            <div class="grid gap-4 md:grid-cols-3">
+            <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <BoonWeb.Components.Card.card
                 variant="bordered"
                 color="warning"
@@ -135,6 +152,68 @@ defmodule BoonWeb.ShipLive do
                 <p class="mt-3 text-sm text-stone-300">
                   Scan a pallet-tag QR code to open this page on <span class="font-semibold text-stone-100">{shipping_host()}</span>.
                 </p>
+              </BoonWeb.Components.Card.card>
+
+              <BoonWeb.Components.Card.card
+                variant="bordered"
+                color="warning"
+                rounded="large"
+                class="bg-black/15"
+                padding="medium"
+              >
+                <p class="app-kicker text-[0.68rem]">Camera</p>
+
+                <div
+                  id="shipping-camera-scanner"
+                  phx-hook=".PalletTagScanner"
+                  phx-update="ignore"
+                  class="mt-3 space-y-4"
+                >
+                  <p id="shipment-scanner-status" class="text-sm text-stone-300">
+                    Use the in-app camera to scan pallet tags.
+                  </p>
+
+                  <div class="overflow-hidden rounded-[1.5rem] border border-white/10 bg-black/30">
+                    <video
+                      id="shipment-scanner-preview"
+                      class="hidden aspect-[4/3] w-full object-cover"
+                      autoplay
+                      muted
+                      playsinline
+                    >
+                    </video>
+
+                    <div
+                      id="shipment-scanner-placeholder"
+                      class="flex aspect-[4/3] items-center justify-center px-4 text-center text-sm text-stone-400"
+                    >
+                      Camera preview appears here after you allow access.
+                    </div>
+                  </div>
+
+                  <div class="flex flex-wrap gap-3">
+                    <BoonWeb.Components.Button.button
+                      id="start-shipment-scanner"
+                      type="button"
+                      variant="shadow"
+                      color="warning"
+                      size="medium"
+                    >
+                      Open Camera
+                    </BoonWeb.Components.Button.button>
+
+                    <BoonWeb.Components.Button.button
+                      id="stop-shipment-scanner"
+                      type="button"
+                      variant="bordered"
+                      color="warning"
+                      size="medium"
+                      class="hidden"
+                    >
+                      Stop Camera
+                    </BoonWeb.Components.Button.button>
+                  </div>
+                </div>
               </BoonWeb.Components.Card.card>
 
               <BoonWeb.Components.Card.card
@@ -363,6 +442,162 @@ defmodule BoonWeb.ShipLive do
                 }
               }
             </script>
+
+            <script :type={Phoenix.LiveView.ColocatedHook} name=".PalletTagScanner">
+              export default {
+                mounted() {
+                  this.video = this.el.querySelector("#shipment-scanner-preview")
+                  this.placeholder = this.el.querySelector("#shipment-scanner-placeholder")
+                  this.status = this.el.querySelector("#shipment-scanner-status")
+                  this.startButton = this.el.querySelector("#start-shipment-scanner")
+                  this.stopButton = this.el.querySelector("#stop-shipment-scanner")
+                  this.stream = null
+                  this.scanTimeout = null
+                  this.lastScannedValue = null
+                  this.lastScannedAt = 0
+                  this.scanning = false
+                  this.detector = null
+
+                  this.startScanner = this.startScanner.bind(this)
+                  this.stopScanner = this.stopScanner.bind(this)
+
+                  this.startButton.addEventListener("click", this.startScanner)
+                  this.stopButton.addEventListener("click", this.stopScanner)
+
+                  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    this.disableStart("Camera access is unavailable in this browser.")
+                    return
+                  }
+
+                  if (!("BarcodeDetector" in window)) {
+                    this.disableStart(
+                      "In-app QR scanning is unavailable in this browser. Open the tag URL directly or use a supported mobile browser."
+                    )
+                    return
+                  }
+
+                  try {
+                    this.detector = new window.BarcodeDetector({formats: ["qr_code"]})
+                  } catch (_error) {
+                    this.disableStart(
+                      "This browser cannot start the QR detector. Open the tag URL directly or use a supported mobile browser."
+                    )
+                  }
+                },
+
+                unmounted() {
+                  this.startButton.removeEventListener("click", this.startScanner)
+                  this.stopButton.removeEventListener("click", this.stopScanner)
+                  this.stopScanner(false)
+                },
+
+                disableStart(message) {
+                  this.setStatus(message)
+                  this.startButton.setAttribute("disabled", "disabled")
+                  this.startButton.classList.add("cursor-not-allowed", "opacity-40")
+                },
+
+                async startScanner() {
+                  if (this.scanning || !this.detector) {
+                    return
+                  }
+
+                  try {
+                    this.stream = await navigator.mediaDevices.getUserMedia({
+                      video: {facingMode: {ideal: "environment"}}
+                    })
+
+                    this.video.srcObject = this.stream
+                    await this.video.play()
+                    this.placeholder.classList.add("hidden")
+                    this.video.classList.remove("hidden")
+                    this.startButton.classList.add("hidden")
+                    this.stopButton.classList.remove("hidden")
+                    this.scanning = true
+                    this.setStatus("Camera ready. Point it at a pallet-tag QR code.")
+                    this.scanFrame()
+                  } catch (_error) {
+                    this.stopScanner(false)
+                    this.setStatus(
+                      "Camera access was blocked or unavailable. Check browser permissions and try again."
+                    )
+                  }
+                },
+
+                stopScanner(updateStatus = true) {
+                  this.scanning = false
+
+                  if (this.scanTimeout) {
+                    window.clearTimeout(this.scanTimeout)
+                    this.scanTimeout = null
+                  }
+
+                  if (this.video) {
+                    this.video.pause()
+                    this.video.srcObject = null
+                    this.video.classList.add("hidden")
+                  }
+
+                  if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop())
+                    this.stream = null
+                  }
+
+                  this.placeholder.classList.remove("hidden")
+                  this.startButton.classList.remove("hidden")
+                  this.stopButton.classList.add("hidden")
+
+                  if (updateStatus) {
+                    this.setStatus("Camera stopped.")
+                  }
+                },
+
+                scheduleNextScan(delay = 250) {
+                  if (!this.scanning) {
+                    return
+                  }
+
+                  this.scanTimeout = window.setTimeout(() => this.scanFrame(), delay)
+                },
+
+                shouldAcceptScan(rawValue) {
+                  const now = Date.now()
+                  return rawValue !== this.lastScannedValue || now - this.lastScannedAt > 2000
+                },
+
+                async scanFrame() {
+                  if (!this.scanning || !this.detector || !this.video || this.video.readyState < 2) {
+                    this.scheduleNextScan()
+                    return
+                  }
+
+                  try {
+                    const codes = await this.detector.detect(this.video)
+                    const match = codes.find(code => typeof code.rawValue === "string" && code.rawValue.trim() !== "")
+
+                    if (match && this.shouldAcceptScan(match.rawValue)) {
+                      this.lastScannedValue = match.rawValue
+                      this.lastScannedAt = Date.now()
+                      this.setStatus("Pallet tag detected. Adding it to the shipment draft...")
+
+                      this.pushEvent("scan_pallet_tag", {payload: match.rawValue}, () => {
+                        this.setStatus("Pallet tag scanned. Keep scanning or stop the camera.")
+                      })
+
+                      this.scheduleNextScan(1200)
+                      return
+                    }
+                  } catch (_error) {
+                  }
+
+                  this.scheduleNextScan()
+                },
+
+                setStatus(message) {
+                  this.status.textContent = message
+                }
+              }
+            </script>
           </BoonWeb.Components.Card.card_content>
         </BoonWeb.Components.Card.card>
       </section>
@@ -415,6 +650,44 @@ defmodule BoonWeb.ShipLive do
     end
   end
 
+  defp scanned_token_from_payload(payload) when is_binary(payload) do
+    payload = String.trim(payload)
+
+    cond do
+      payload == "" ->
+        {:error, "The scanned QR code did not contain a pallet tag."}
+
+      true ->
+        case token_from_scanned_uri(payload) do
+          {:ok, token} -> {:ok, token}
+          :error -> resolve_scanned_token(payload)
+        end
+    end
+  end
+
+  defp scanned_token_from_payload(_payload),
+    do: {:error, "The scanned QR code did not contain a pallet tag."}
+
+  defp resolve_scanned_token(token) do
+    case Operations.resolve_shipping_token(token) do
+      {:ok, _tag} -> {:ok, token}
+      {:error, _error} -> {:error, "The scanned QR code did not contain a pallet-tag link or token."}
+    end
+  end
+
+  defp token_from_scanned_uri(payload) do
+    case URI.parse(payload) do
+      %URI{query: query} when is_binary(query) ->
+        case URI.decode_query(query) do
+          %{"tag" => token} when byte_size(token) > 0 -> {:ok, token}
+          _other -> :error
+        end
+
+      _other ->
+        :error
+    end
+  end
+
   defp draft_storage_key do
     Application.get_env(:boon, :shipping, [])
     |> Keyword.get(:draft_storage_key, "boon-shipment-draft-v1")
@@ -422,7 +695,7 @@ defmodule BoonWeb.ShipLive do
 
   defp shipping_host do
     Application.get_env(:boon, :shipping, [])
-    |> Keyword.get(:host, "BOON")
+    |> Keyword.get(:host, "boon.historia.studio")
   end
 
   defp packing_slip_dispatch_options do

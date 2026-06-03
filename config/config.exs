@@ -13,9 +13,9 @@ config :boon,
   generators: [timestamp_type: :utc_datetime],
   pdf_intake_parser: Boon.PDF.HostParser,
   shipping: [
-    host: "BOON",
-    port: 4000,
-    scheme: "http",
+    host: "boon.historia.studio",
+    port: 443,
+    scheme: "https",
     draft_storage_key: "boon-shipment-draft-v1"
   ],
   printing: [
@@ -36,7 +36,7 @@ config :ex_money, default_cldr_backend: Boon.Cldr
 
 # Configure the endpoint
 config :boon, BoonWeb.Endpoint,
-  url: [host: "BOON", port: 4000],
+  url: [host: "boon.historia.studio", port: 443, scheme: "https"],
   adapter: Bandit.PhoenixAdapter,
   render_errors: [
     formats: [html: BoonWeb.ErrorHTML, json: BoonWeb.ErrorJSON],
