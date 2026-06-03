@@ -85,26 +85,19 @@ defmodule BoonWeb.ShipmentLive.Show do
                   size="medium"
                   phx-click="reprint_packing_slip"
                 >
-                  Reprint Packing Slip
+                  Print
                 </BoonWeb.Components.Button.button>
                 <BoonWeb.Components.Button.button_link
                   id="download-packing-slip"
                   href={~p"/shipments/#{@shipment.id}/packing-slip"}
-                  variant="outline"
+                  class="flex"
+                  variant="shadow"
                   color="warning"
                   icon="hero-arrow-down-tray"
                   size="medium"
                   download
                 >
-                  Download PDF
-                </BoonWeb.Components.Button.button_link>
-                <BoonWeb.Components.Button.button_link
-                  navigate={~p"/shipments"}
-                  variant="outline"
-                  color="warning"
-                  size="medium"
-                >
-                  All Shipments
+                  PDF
                 </BoonWeb.Components.Button.button_link>
                 <BoonWeb.Components.Button.button_link
                   navigate={~p"/work-packages/#{@shipment.work_package.id}"}
@@ -112,7 +105,7 @@ defmodule BoonWeb.ShipmentLive.Show do
                   color="danger"
                   size="medium"
                 >
-                  Open Work Package
+                  Work Package
                 </BoonWeb.Components.Button.button_link>
                 <BoonWeb.Components.Button.button
                   id="delete-shipment"
