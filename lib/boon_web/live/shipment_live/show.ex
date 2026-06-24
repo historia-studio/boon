@@ -198,11 +198,11 @@ defmodule BoonWeb.ShipmentLive.Show do
           <:col :let={entry} label="Pair">{entry.pair_number}</:col>
 
           <:col :let={entry} label="Tank Item">
-            <span class="text-stone-400">{entry.tank_item_number}</span>
+            <span class="text-stone-400">{shipment_entry_item_number(entry.tank_item_number)}</span>
           </:col>
 
           <:col :let={entry} label="Cabinet Item">
-            <span class="text-stone-400">{entry.cabinet_item_number}</span>
+            <span class="text-stone-400">{shipment_entry_item_number(entry.cabinet_item_number)}</span>
           </:col>
         </BoonWeb.Components.Table.table>
       </section>
@@ -258,6 +258,9 @@ defmodule BoonWeb.ShipmentLive.Show do
   defp pallet_type_label("cabinet"), do: "Cabinet"
   defp pallet_type_label("bundle"), do: "Bundle"
   defp pallet_type_label(value), do: value
+
+  defp shipment_entry_item_number(item_number) when item_number in [nil, ""], do: "-"
+  defp shipment_entry_item_number(item_number), do: item_number
 
   defp format_datetime(%DateTime{} = datetime), do: Calendar.strftime(datetime, "%Y-%m-%d %H:%M")
   defp format_datetime(_datetime), do: "-"

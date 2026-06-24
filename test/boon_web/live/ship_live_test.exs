@@ -144,6 +144,29 @@ defmodule BoonWeb.ShipLiveTest do
     assert shipment.entry_count == 1
   end
 
+  test "ship page can confirm an unmatched tank shipment", %{conn: conn} do
+    work_package = single_tank_work_package_fixture()
+    [purchase_order] = work_package.purchase_orders
+
+    token = PalletTagToken.sign(work_package.id, purchase_order.id, 2, "tank")
+
+    {:ok, view, html} = live(conn, ~p"/ship?tag=#{token}")
+
+    assert html =~ purchase_order.po_number
+    assert html =~ "Tank 2"
+
+    view
+    |> element("#submit-shipment")
+    |> render_click()
+
+    assert render(view) =~ "confirmed with 1 pallet tags"
+
+    [shipment] = Ash.read!(Shipment)
+    shipment = Operations.get_shipment!(shipment.id)
+    assert shipment.entry_count == 1
+    assert [%{tank_item_number: "86-SA-T100", cabinet_item_number: nil}] = shipment.entries
+  end
+
   defp work_package_fixture do
     {:ok, work_package} =
       Operations.create_work_package_entry(%{
@@ -157,6 +180,28 @@ defmodule BoonWeb.ShipLiveTest do
             ship_to: "chilliwack",
             lines: [
               %{line: 1, item_number: "86-SA-T100", quantity: 1, ship_date: ~D[2026-04-10]},
+              %{line: 2, item_number: "86-SA-C100", quantity: 1, ship_date: ~D[2026-04-10]}
+            ]
+          }
+        ]
+      })
+
+    Operations.get_work_package!(work_package.id)
+  end
+
+  defp single_tank_work_package_fixture do
+    {:ok, work_package} =
+      Operations.create_work_package_entry(%{
+        number: "WP-#{System.unique_integer([:positive])}",
+        purchase_orders: [
+          %{
+            po_number: "PO-#{System.unique_integer([:positive])}",
+            order_date: ~D[2026-03-20],
+            revision_date: ~D[2026-03-21],
+            reference: "TRANSFORMER, ANSI/IEEE GREEN, PRIORITY",
+            ship_to: "chilliwack",
+            lines: [
+              %{line: 1, item_number: "86-SA-T100", quantity: 2, ship_date: ~D[2026-04-10]},
               %{line: 2, item_number: "86-SA-C100", quantity: 1, ship_date: ~D[2026-04-10]}
             ]
           }

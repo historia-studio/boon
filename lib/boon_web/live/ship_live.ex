@@ -707,8 +707,11 @@ defmodule BoonWeb.ShipLive do
 
   defp resolve_scanned_token(token) do
     case Operations.resolve_shipping_token(token) do
-      {:ok, _tag} -> {:ok, token}
-      {:error, _error} -> {:error, "The scanned QR code did not contain a pallet-tag link or token."}
+      {:ok, _tag} ->
+        {:ok, token}
+
+      {:error, _error} ->
+        {:error, "The scanned QR code did not contain a pallet-tag link or token."}
     end
   end
 

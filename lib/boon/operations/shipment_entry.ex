@@ -65,12 +65,12 @@ defmodule Boon.Operations.ShipmentEntry do
     end
 
     attribute :tank_item_number, :string do
-      allow_nil?(false)
+      allow_nil?(true)
       public?(true)
     end
 
     attribute :cabinet_item_number, :string do
-      allow_nil?(false)
+      allow_nil?(true)
       public?(true)
     end
 

@@ -235,25 +235,33 @@ defmodule Boon.Operations do
       entries = Map.get(attrs, :entries, [])
 
       with {:ok, first_entry} <- fetch_first_entry(entries),
-           {:ok, shipment} <-
-             Ash.create(Shipment, %{
+           {:ok, shipment, shipment_notifications} <-
+             create_resource(Shipment, %{
                confirmed_at: Map.get(attrs, :confirmed_at, DateTime.utc_now()),
                submitted_from: Map.get(attrs, :submitted_from),
                entry_count: length(entries),
                work_package_id: first_entry.work_package_id
              }),
-           {:ok, created_entries} <- create_shipment_entries(shipment, entries),
-           {:ok, _updated_purchase_orders} <-
+           {:ok, created_entries, entry_notifications} <-
+             create_shipment_entries(shipment, entries),
+           {:ok, purchase_order_notifications} <-
              update_purchase_order_shipping_status(created_entries) do
-        %{shipment | entries: created_entries}
+        {%{shipment | entries: created_entries},
+         shipment_notifications ++ entry_notifications ++ purchase_order_notifications}
       else
         {:error, error} -> Repo.rollback(format_error(error))
       end
     end)
     |> case do
-      {:ok, shipment} -> {:ok, shipment}
-      {:error, errors} when is_list(errors) -> {:error, errors}
-      {:error, error} -> {:error, [format_error(error)]}
+      {:ok, {shipment, notifications}} ->
+        notify(notifications)
+        {:ok, shipment}
+
+      {:error, errors} when is_list(errors) ->
+        {:error, errors}
+
+      {:error, error} ->
+        {:error, [format_error(error)]}
     end
   end
 
@@ -592,29 +600,38 @@ defmodule Boon.Operations do
 
   defp create_shipment_entries(shipment, entries) do
     entries
-    |> Enum.reduce_while({:ok, []}, fn entry, {:ok, created_entries} ->
+    |> Enum.reduce_while({:ok, [], []}, fn entry, {:ok, created_entries, notifications} ->
       attrs = %{
         pallet_tag_token: entry.pallet_tag_token,
         pair_number: entry.pair_number,
         pallet_type: entry.pallet_type,
         po_number: entry.po_number,
-        tank_item_number: entry.tank_item_number,
-        cabinet_item_number: entry.cabinet_item_number,
+        tank_item_number: normalize_shipment_entry_item_number(entry.tank_item_number),
+        cabinet_item_number: normalize_shipment_entry_item_number(entry.cabinet_item_number),
         work_package_id: entry.work_package_id,
         purchase_order_id: entry.purchase_order_id,
         shipment_id: shipment.id
       }
 
-      case Ash.create(ShipmentEntry, attrs) do
-        {:ok, created_entry} -> {:cont, {:ok, [created_entry | created_entries]}}
-        {:error, error} -> {:halt, {:error, error}}
+      case create_resource(ShipmentEntry, attrs) do
+        {:ok, created_entry, entry_notifications} ->
+          {:cont, {:ok, [created_entry | created_entries], notifications ++ entry_notifications}}
+
+        {:error, error} ->
+          {:halt, {:error, error}}
       end
     end)
     |> case do
-      {:ok, created_entries} -> {:ok, Enum.reverse(created_entries)}
-      {:error, error} -> {:error, error}
+      {:ok, created_entries, notifications} ->
+        {:ok, Enum.reverse(created_entries), notifications}
+
+      {:error, error} ->
+        {:error, error}
     end
   end
+
+  defp normalize_shipment_entry_item_number(item_number) when item_number in [nil, ""], do: nil
+  defp normalize_shipment_entry_item_number(item_number), do: item_number
 
   defp update_purchase_order_shipping_status(entries) do
     entries
