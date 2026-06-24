@@ -66,14 +66,14 @@ defmodule Boon.Operations do
   def list_shipments do
     Shipment
     |> Ash.Query.sort(confirmed_at: :desc, inserted_at: :desc)
-    |> Ash.Query.load([:work_package, entries: :purchase_order])
+    |> Ash.Query.load(entries: [:purchase_order, :work_package])
     |> Ash.read!()
     |> Enum.map(&sort_shipment/1)
   end
 
   def get_shipment!(id) do
     Shipment
-    |> Ash.get!(id, load: [:work_package, entries: :purchase_order])
+    |> Ash.get!(id, load: [entries: [:purchase_order, :work_package]])
     |> sort_shipment()
   end
 
@@ -234,13 +234,12 @@ defmodule Boon.Operations do
     Repo.transaction(fn ->
       entries = Map.get(attrs, :entries, [])
 
-      with {:ok, first_entry} <- fetch_first_entry(entries),
+      with {:ok, _first_entry} <- fetch_first_entry(entries),
            {:ok, shipment, shipment_notifications} <-
              create_resource(Shipment, %{
                confirmed_at: Map.get(attrs, :confirmed_at, DateTime.utc_now()),
                submitted_from: Map.get(attrs, :submitted_from),
-               entry_count: length(entries),
-               work_package_id: first_entry.work_package_id
+               entry_count: length(entries)
              }),
            {:ok, created_entries, entry_notifications} <-
              create_shipment_entries(shipment, entries),
@@ -575,27 +574,19 @@ defmodule Boon.Operations do
   end
 
   defp shipment_entries_from_tags(tags) do
-    work_package_ids = tags |> Enum.map(& &1.work_package_id) |> Enum.uniq()
-
-    case work_package_ids do
-      [_single_work_package_id] ->
-        {:ok,
-         Enum.map(tags, fn tag ->
-           %{
-             pallet_tag_token: tag.pallet_tag_token,
-             pair_number: tag.pair_number,
-             pallet_type: tag.pallet_type,
-             po_number: tag.po_number,
-             tank_item_number: tag.tank_item_number,
-             cabinet_item_number: tag.cabinet_item_number,
-             work_package_id: tag.work_package_id,
-             purchase_order_id: tag.purchase_order_id
-           }
-         end)}
-
-      _other ->
-        {:error, "A shipment can only include pallet tags from one work package at a time."}
-    end
+    {:ok,
+     Enum.map(tags, fn tag ->
+       %{
+         pallet_tag_token: tag.pallet_tag_token,
+         pair_number: tag.pair_number,
+         pallet_type: tag.pallet_type,
+         po_number: tag.po_number,
+         tank_item_number: tag.tank_item_number,
+         cabinet_item_number: tag.cabinet_item_number,
+         work_package_id: tag.work_package_id,
+         purchase_order_id: tag.purchase_order_id
+       }
+     end)}
   end
 
   defp create_shipment_entries(shipment, entries) do

@@ -128,7 +128,7 @@ defmodule Boon.Printing.Dispatcher do
           create_failed_result(
             @packing_slip_document_type,
             nil,
-            loaded_shipment.work_package_id,
+            shipment_print_job_work_package_id(loaded_shipment),
             nil,
             nil,
             error,
@@ -150,7 +150,7 @@ defmodule Boon.Printing.Dispatcher do
            }}
           | {:error, %{shipment: map, error: String.t()}}
   def build_shipment_packing_slip_pdf(shipment) do
-    shipment = Ash.load!(shipment, [:work_package, entries: :purchase_order])
+    shipment = Ash.load!(shipment, entries: [:purchase_order, :work_package])
     shipment_index = shipment_sequence_number(shipment)
 
     case PackingSlip.build(shipment, shipment_index) do
@@ -161,7 +161,7 @@ defmodule Boon.Printing.Dispatcher do
            packing_slip: packing_slip,
            shipment_index: shipment_index,
            content: PackingSlipPdf.render(packing_slip),
-           filename: packing_slip_filename(shipment.work_package.number, shipment_index)
+           filename: packing_slip_filename(packing_slip.filename_identifier, shipment_index)
          }}
 
       {:error, error} ->
@@ -182,7 +182,7 @@ defmodule Boon.Printing.Dispatcher do
         create_failed_result(
           @packing_slip_document_type,
           nil,
-          shipment.work_package_id,
+          shipment_print_job_work_package_id(shipment),
           nil,
           nil,
           "No packing-slip printer is configured for ship-to #{packing_slip.ship_to || "unknown"}.",
@@ -193,7 +193,7 @@ defmodule Boon.Printing.Dispatcher do
         payload_path =
           build_payload_path(
             opts,
-            ["packing-slip", shipment.work_package.number, shipment_index],
+            ["packing-slip", packing_slip.filename_identifier, shipment_index],
             ".pdf"
           )
 
@@ -203,7 +203,7 @@ defmodule Boon.Printing.Dispatcher do
         run_print_job(
           @packing_slip_document_type,
           printer,
-          shipment.work_package_id,
+          shipment_print_job_work_package_id(shipment),
           nil,
           payload_path,
           fn -> PackingSlipPdf.write(packing_slip, payload_path) end,
@@ -555,20 +555,14 @@ defmodule Boon.Printing.Dispatcher do
   end
 
   defp shipment_sequence_number(shipment) do
-    shipment
-    |> shipments_for_work_package()
+    Shipment
+    |> Ash.read!()
     |> Enum.sort_by(&shipment_sort_key/1)
     |> Enum.find_index(&(&1.id == shipment.id))
     |> case do
       nil -> 1
       index -> index + 1
     end
-  end
-
-  defp shipments_for_work_package(shipment) do
-    Shipment
-    |> Ash.read!()
-    |> Enum.filter(&(&1.work_package_id == shipment.work_package_id))
   end
 
   defp shipment_sort_key(shipment) do
@@ -595,6 +589,18 @@ defmodule Boon.Printing.Dispatcher do
       sanitize_filename(["packing-slip", work_package_number, shipment_index] |> Enum.join("-"))
 
     base <> ".pdf"
+  end
+
+  defp shipment_print_job_work_package_id(shipment) do
+    shipment
+    |> Map.get(:entries, [])
+    |> Enum.map(&Map.get(&1, :work_package_id))
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
+    |> case do
+      [work_package_id] -> work_package_id
+      _other -> nil
+    end
   end
 
   defp sanitize_filename(value) do

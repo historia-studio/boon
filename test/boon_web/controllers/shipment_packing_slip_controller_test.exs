@@ -4,7 +4,7 @@ defmodule BoonWeb.ShipmentPackingSlipControllerTest do
   alias Boon.Operations
 
   test "GET /shipments/:id/packing-slip downloads the generated packing slip PDF", %{conn: conn} do
-    shipment = shipment_fixture()
+    {shipment, work_package} = shipment_fixture()
 
     conn = get(conn, ~p"/shipments/#{shipment.id}/packing-slip")
 
@@ -14,7 +14,7 @@ defmodule BoonWeb.ShipmentPackingSlipControllerTest do
     assert [disposition] = get_resp_header(conn, "content-disposition")
 
     assert disposition =~
-             "attachment; filename=\"packing-slip-#{String.downcase(shipment.work_package.number)}-1.pdf\""
+             "attachment; filename=\"packing-slip-#{String.downcase(work_package.number)}-1.pdf\""
   end
 
   defp shipment_fixture do
@@ -39,7 +39,7 @@ defmodule BoonWeb.ShipmentPackingSlipControllerTest do
         ]
       })
 
-    Operations.get_shipment!(shipment.id)
+    {Operations.get_shipment!(shipment.id), work_package}
   end
 
   defp work_package_fixture do

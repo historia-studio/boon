@@ -13,12 +13,12 @@ defmodule Boon.Operations.Shipment do
 
     create :create do
       primary?(true)
-      accept([:confirmed_at, :submitted_from, :entry_count, :work_package_id])
+      accept([:confirmed_at, :submitted_from, :entry_count])
     end
 
     update :update do
       primary?(true)
-      accept([:confirmed_at, :submitted_from, :entry_count, :work_package_id])
+      accept([:confirmed_at, :submitted_from, :entry_count])
     end
   end
 
@@ -45,12 +45,6 @@ defmodule Boon.Operations.Shipment do
   end
 
   relationships do
-    belongs_to :work_package, Boon.Operations.WorkPackage do
-      allow_nil?(false)
-      public?(true)
-      attribute_public?(true)
-    end
-
     has_many :entries, Boon.Operations.ShipmentEntry do
       public?(true)
       destination_attribute(:shipment_id)

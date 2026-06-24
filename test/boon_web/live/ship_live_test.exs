@@ -144,6 +144,36 @@ defmodule BoonWeb.ShipLiveTest do
     assert shipment.entry_count == 1
   end
 
+  test "ship page can confirm pallet tags from multiple work packages", %{conn: conn} do
+    first_work_package = work_package_fixture()
+    second_work_package = work_package_fixture()
+    [first_purchase_order] = first_work_package.purchase_orders
+    [second_purchase_order] = second_work_package.purchase_orders
+
+    first_token = PalletTagToken.sign(first_work_package.id, first_purchase_order.id, 1, "tank")
+    second_token = PalletTagToken.sign(second_work_package.id, second_purchase_order.id, 1, "tank")
+
+    {:ok, view, html} = live(conn, ~p"/ship?tag=#{first_token}")
+
+    assert html =~ first_purchase_order.po_number
+
+    rendered = render_hook(view, "scan_pallet_tag", %{"payload" => second_token})
+    assert rendered =~ second_purchase_order.po_number
+    assert rendered =~ "2 work packages"
+
+    view
+    |> element("#submit-shipment")
+    |> render_click()
+
+    rendered = render(view)
+    assert rendered =~ "confirmed with 2 pallet tags"
+
+    [shipment] = Ash.read!(Shipment)
+    shipment = Operations.get_shipment!(shipment.id)
+    assert shipment.entry_count == 2
+    assert Enum.map(shipment.entries, & &1.work_package.number) |> Enum.uniq() |> length() == 2
+  end
+
   test "ship page can confirm an unmatched tank shipment", %{conn: conn} do
     work_package = single_tank_work_package_fixture()
     [purchase_order] = work_package.purchase_orders

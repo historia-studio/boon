@@ -14,25 +14,25 @@ defmodule Boon.Printing.PackingSlip do
 
   @spec build(map, pos_integer) :: {:ok, map} | {:error, String.t()}
   def build(shipment, shipment_index) when is_integer(shipment_index) and shipment_index > 0 do
-    work_package = Map.get(shipment, :work_package)
     entries = Map.get(shipment, :entries, [])
 
     cond do
-      is_nil(work_package) or is_nil(Map.get(work_package, :number)) ->
-        {:error, "Packing slip generation requires the shipment work package to be loaded."}
-
       not is_list(entries) or entries == [] ->
         {:error, "Packing slip generation requires at least one shipment entry."}
 
       true ->
-        with {:ok, ship_to} <- resolve_ship_to(entries) do
+        with {:ok, work_package_numbers} <- resolve_work_package_numbers(entries),
+             {:ok, ship_to} <- resolve_ship_to(entries) do
           rows = build_rows(entries)
+          work_package_label = Enum.join(work_package_numbers, ", ")
+          filename_identifier = packing_slip_filename_identifier(work_package_numbers)
 
           {:ok,
            %{
-             title: "PACKING SLIP #{work_package.number}-#{shipment_index}",
+             title: "PACKING SLIP #{packing_slip_title_identifier(work_package_numbers)}-#{shipment_index}",
              shipment_date: Map.get(shipment, :confirmed_at),
-             work_package_number: work_package.number,
+             work_package_number: work_package_label,
+             filename_identifier: filename_identifier,
              ship_via: ShippingLocation.ship_via(ship_to) || "-",
              sender_lines: @sender_lines,
              ship_to_lines: ShippingLocation.address_lines(ship_to),
@@ -40,6 +40,28 @@ defmodule Boon.Printing.PackingSlip do
              rows: rows
            }}
         end
+    end
+  end
+
+  defp resolve_work_package_numbers(entries) do
+    entries
+    |> Enum.reduce_while({:ok, []}, fn entry, {:ok, numbers} ->
+      case Map.get(entry, :work_package) do
+        %{number: number} when is_binary(number) and number != "" ->
+          {:cont, {:ok, [number | numbers]}}
+
+        _other ->
+          {:halt,
+           {:error,
+            "Packing slip generation requires the shipment entry work packages to be loaded."}}
+      end
+    end)
+    |> case do
+      {:ok, numbers} ->
+        {:ok, numbers |> Enum.uniq() |> Enum.sort()}
+
+      {:error, error} ->
+        {:error, error}
     end
   end
 
@@ -108,4 +130,10 @@ defmodule Boon.Printing.PackingSlip do
   defp part_sort_key("Cabinet"), do: 1
   defp part_sort_key("Bundle"), do: 2
   defp part_sort_key(_other), do: 3
+
+  defp packing_slip_title_identifier([work_package_number]), do: work_package_number
+  defp packing_slip_title_identifier(_work_package_numbers), do: "MULTI"
+
+  defp packing_slip_filename_identifier([work_package_number]), do: work_package_number
+  defp packing_slip_filename_identifier(_work_package_numbers), do: "multi"
 end

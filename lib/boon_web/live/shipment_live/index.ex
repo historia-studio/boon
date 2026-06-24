@@ -96,8 +96,8 @@ defmodule BoonWeb.ShipmentLive.Index do
               </span>
             </:col>
 
-            <:col :let={shipment} label="Work Package">
-              <span class="text-stone-400">WP {shipment.work_package.number}</span>
+            <:col :let={shipment} label="Work Packages">
+              <span class="text-stone-400">{shipment_work_package_summary(shipment)}</span>
             </:col>
 
             <:col :let={shipment} label="Destination">{shipment_destination_label(shipment)}</:col>
@@ -152,6 +152,26 @@ defmodule BoonWeb.ShipmentLive.Index do
 
   defp shipment_ship_to(%{entries: [%{purchase_order: %{ship_to: ship_to}} | _rest]}), do: ship_to
   defp shipment_ship_to(_shipment), do: nil
+
+  defp shipment_work_package_summary(shipment) do
+    shipment
+    |> shipment_work_packages()
+    |> Enum.map(&"WP #{&1.number}")
+    |> Enum.join(", ")
+    |> case do
+      "" -> "-"
+      summary -> summary
+    end
+  end
+
+  defp shipment_work_packages(shipment) do
+    shipment
+    |> Map.get(:entries, [])
+    |> Enum.map(&Map.get(&1, :work_package))
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq_by(& &1.id)
+    |> Enum.sort_by(& &1.number)
+  end
 
   defp format_datetime(%DateTime{} = datetime), do: Calendar.strftime(datetime, "%Y-%m-%d %H:%M")
   defp format_datetime(_datetime), do: "-"

@@ -69,9 +69,7 @@ defmodule BoonWeb.ShipmentLive.Show do
                 <h1 class="text-4xl font-semibold text-stone-50">{shipment_heading(@shipment)}</h1>
 
                 <p class="text-sm text-stone-400">
-                  Work Package {@shipment.work_package.number} · {shipment_destination_label(
-                    @shipment
-                  )}
+                  {shipment_work_package_count_label(@shipment)} · {shipment_destination_label(@shipment)}
                 </p>
               </div>
 
@@ -99,14 +97,6 @@ defmodule BoonWeb.ShipmentLive.Show do
                 >
                   PDF
                 </BoonWeb.Components.Button.button_link>
-                <BoonWeb.Components.Button.button_link
-                  navigate={~p"/work-packages/#{@shipment.work_package.id}"}
-                  variant="outline"
-                  color="danger"
-                  size="medium"
-                >
-                  Work Package
-                </BoonWeb.Components.Button.button_link>
                 <BoonWeb.Components.Button.button
                   id="delete-shipment"
                   type="button"
@@ -121,7 +111,7 @@ defmodule BoonWeb.ShipmentLive.Show do
               </div>
             </div>
 
-            <div class="grid gap-4 md:grid-cols-4">
+            <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
               <BoonWeb.Components.Card.card
                 variant="bordered"
                 color="danger"
@@ -133,6 +123,20 @@ defmodule BoonWeb.ShipmentLive.Show do
 
                 <p class="mt-3 text-lg font-semibold text-stone-50">
                   {format_datetime(@shipment.confirmed_at)}
+                </p>
+              </BoonWeb.Components.Card.card>
+
+              <BoonWeb.Components.Card.card
+                variant="bordered"
+                color="warning"
+                rounded="large"
+                class="bg-black/20"
+                padding="medium"
+              >
+                <p class="text-sm text-stone-400">Work Packages</p>
+
+                <p class="mt-3 text-3xl font-semibold text-stone-50">
+                  {length(shipment_work_packages(@shipment))}
                 </p>
               </BoonWeb.Components.Card.card>
 
@@ -187,6 +191,15 @@ defmodule BoonWeb.ShipmentLive.Show do
           rounded="large"
           class="text-stone-200"
         >
+          <:col :let={entry} label="Work Package">
+            <.link
+              navigate={~p"/work-packages/#{entry.work_package.id}"}
+              class="font-semibold text-amber-200 transition hover:text-amber-100"
+            >
+              WP {entry.work_package.number}
+            </.link>
+          </:col>
+
           <:col :let={entry} label="PO Number">
             <span class="font-semibold text-stone-50">PO {entry.po_number}</span>
           </:col>
@@ -253,6 +266,24 @@ defmodule BoonWeb.ShipmentLive.Show do
 
   defp shipment_ship_to(%{entries: [%{purchase_order: %{ship_to: ship_to}} | _rest]}), do: ship_to
   defp shipment_ship_to(_shipment), do: nil
+
+  defp shipment_work_package_count_label(shipment) do
+    count = shipment |> shipment_work_packages() |> length()
+
+    case count do
+      1 -> "1 work package"
+      _other -> "#{count} work packages"
+    end
+  end
+
+  defp shipment_work_packages(shipment) do
+    shipment
+    |> Map.get(:entries, [])
+    |> Enum.map(&Map.get(&1, :work_package))
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq_by(& &1.id)
+    |> Enum.sort_by(& &1.number)
+  end
 
   defp pallet_type_label("tank"), do: "Tank"
   defp pallet_type_label("cabinet"), do: "Cabinet"

@@ -75,7 +75,7 @@ defmodule Boon.Operations.PrintJob do
 
   relationships do
     belongs_to :work_package, Boon.Operations.WorkPackage do
-      allow_nil?(false)
+      allow_nil?(true)
       public?(true)
       attribute_public?(true)
     end
