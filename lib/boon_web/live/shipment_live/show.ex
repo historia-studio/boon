@@ -69,7 +69,9 @@ defmodule BoonWeb.ShipmentLive.Show do
                 <h1 class="text-4xl font-semibold text-stone-50">{shipment_heading(@shipment)}</h1>
 
                 <p class="text-sm text-stone-400">
-                  {shipment_work_package_count_label(@shipment)} · {shipment_destination_label(@shipment)}
+                  {shipment_work_package_count_label(@shipment)} · {shipment_destination_label(
+                    @shipment
+                  )}
                 </p>
               </div>
 
@@ -215,7 +217,9 @@ defmodule BoonWeb.ShipmentLive.Show do
           </:col>
 
           <:col :let={entry} label="Cabinet Item">
-            <span class="text-stone-400">{shipment_entry_item_number(entry.cabinet_item_number)}</span>
+            <span class="text-stone-400">
+              {shipment_entry_item_number(entry.cabinet_item_number)}
+            </span>
           </:col>
         </BoonWeb.Components.Table.table>
       </section>

@@ -2,6 +2,7 @@ defmodule Boon.Operations do
   use Ash.Domain
 
   import Ecto.Query, only: [from: 2]
+  require Logger
 
   alias Boon.Operations.{
     PrintJob,
@@ -235,6 +236,7 @@ defmodule Boon.Operations do
       entries = Map.get(attrs, :entries, [])
 
       with {:ok, _first_entry} <- fetch_first_entry(entries),
+           :ok <- ensure_entries_not_shipped(entries),
            {:ok, shipment, shipment_notifications} <-
              create_resource(Shipment, %{
                confirmed_at: Map.get(attrs, :confirmed_at, DateTime.utc_now()),
@@ -604,12 +606,23 @@ defmodule Boon.Operations do
         shipment_id: shipment.id
       }
 
-      case create_resource(ShipmentEntry, attrs) do
-        {:ok, created_entry, entry_notifications} ->
-          {:cont, {:ok, [created_entry | created_entries], notifications ++ entry_notifications}}
+      try do
+        case create_resource(ShipmentEntry, attrs) do
+          {:ok, created_entry, entry_notifications} ->
+            {:cont,
+             {:ok, [created_entry | created_entries], notifications ++ entry_notifications}}
 
-        {:error, error} ->
-          {:halt, {:error, error}}
+          {:error, error} ->
+            {:halt, {:error, error}}
+        end
+      rescue
+        error in Ecto.ConstraintError ->
+          log_shipment_entry_constraint_error(error, attrs)
+
+          case duplicate_shipment_entries([entry]) do
+            [] -> {:halt, {:error, error}}
+            duplicates -> {:halt, {:error, duplicate_shipment_entries_error(duplicates)}}
+          end
       end
     end)
     |> case do
@@ -623,6 +636,112 @@ defmodule Boon.Operations do
 
   defp normalize_shipment_entry_item_number(item_number) when item_number in [nil, ""], do: nil
   defp normalize_shipment_entry_item_number(item_number), do: item_number
+
+  defp ensure_entries_not_shipped(entries) do
+    case duplicate_shipment_entries(entries) do
+      [] ->
+        :ok
+
+      duplicates ->
+        Logger.warning(fn ->
+          "Shipment creation blocked because scanned items were already shipped: #{Enum.map_join(duplicates, "; ", &describe_shipment_entry_duplicate/1)}"
+        end)
+
+        {:error, duplicate_shipment_entries_error(duplicates)}
+    end
+  end
+
+  defp duplicate_shipment_entries(entries) do
+    pallet_tag_tokens =
+      entries
+      |> Enum.map(&Map.get(&1, :pallet_tag_token))
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    case pallet_tag_tokens do
+      [] ->
+        []
+
+      pallet_tag_tokens ->
+        duplicates_by_token =
+          from(entry in "shipment_entries",
+            join: shipment in "shipments",
+            on: shipment.id == entry.shipment_id,
+            where: entry.pallet_tag_token in ^pallet_tag_tokens,
+            select: %{
+              pallet_tag_token: entry.pallet_tag_token,
+              po_number: entry.po_number,
+              pair_number: entry.pair_number,
+              pallet_type: entry.pallet_type,
+              tank_item_number: entry.tank_item_number,
+              cabinet_item_number: entry.cabinet_item_number,
+              shipment_id: type(entry.shipment_id, :string),
+              confirmed_at: shipment.confirmed_at
+            }
+          )
+          |> Repo.all()
+          |> Map.new(&{&1.pallet_tag_token, &1})
+
+        entries
+        |> Enum.map(&Map.get(&1, :pallet_tag_token))
+        |> Enum.uniq()
+        |> Enum.map(&Map.get(duplicates_by_token, &1))
+        |> Enum.reject(&is_nil/1)
+    end
+  end
+
+  defp duplicate_shipment_entries_error(duplicates) do
+    duplicate_list =
+      duplicates
+      |> Enum.map(&describe_shipment_entry_duplicate/1)
+      |> Enum.join("; ")
+
+    "Some scanned items have already been shipped: #{duplicate_list}. Remove them from the list and try again."
+  end
+
+  defp describe_shipment_entry_duplicate(duplicate) do
+    item_numbers =
+      [duplicate.tank_item_number, duplicate.cabinet_item_number]
+      |> Enum.reject(&(&1 in [nil, ""]))
+      |> Enum.uniq()
+
+    item_summary =
+      case item_numbers do
+        [] -> nil
+        values -> Enum.join(values, "/")
+      end
+
+    base =
+      [
+        duplicate.po_number,
+        String.capitalize(duplicate.pallet_type),
+        Integer.to_string(duplicate.pair_number)
+      ]
+      |> Enum.join(" ")
+
+    confirmed_summary =
+      case duplicate.confirmed_at do
+        %DateTime{} = confirmed_at ->
+          "already shipped on #{Calendar.strftime(confirmed_at, "%Y-%m-%d %H:%M")}"
+
+        _ ->
+          "already shipped"
+      end
+
+    case item_summary do
+      nil ->
+        "#{base} (shipment #{duplicate.shipment_id}, #{confirmed_summary})"
+
+      summary ->
+        "#{base} item #{summary} (shipment #{duplicate.shipment_id}, #{confirmed_summary})"
+    end
+  end
+
+  defp log_shipment_entry_constraint_error(error, attrs) do
+    Logger.error(fn ->
+      "Shipment entry insert hit constraint error for pallet tag #{inspect(attrs.pallet_tag_token)}: #{Exception.message(error)}"
+    end)
+  end
 
   defp update_purchase_order_shipping_status(entries) do
     entries
@@ -751,6 +870,7 @@ defmodule Boon.Operations do
   end
 
   defp format_error(%{__exception__: true} = error), do: Exception.message(error)
+  defp format_error(error) when is_binary(error), do: error
 
   defp format_error(%{errors: errors}) when is_list(errors) do
     case errors

@@ -29,7 +29,8 @@ defmodule Boon.Printing.PackingSlip do
 
           {:ok,
            %{
-             title: "PACKING SLIP #{packing_slip_title_identifier(work_package_numbers)}-#{shipment_index}",
+             title:
+               "PACKING SLIP #{packing_slip_title_identifier(work_package_numbers)}-#{shipment_index}",
              shipment_date: Map.get(shipment, :confirmed_at),
              work_package_number: work_package_label,
              filename_identifier: filename_identifier,

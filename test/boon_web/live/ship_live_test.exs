@@ -151,7 +151,9 @@ defmodule BoonWeb.ShipLiveTest do
     [second_purchase_order] = second_work_package.purchase_orders
 
     first_token = PalletTagToken.sign(first_work_package.id, first_purchase_order.id, 1, "tank")
-    second_token = PalletTagToken.sign(second_work_package.id, second_purchase_order.id, 1, "tank")
+
+    second_token =
+      PalletTagToken.sign(second_work_package.id, second_purchase_order.id, 1, "tank")
 
     {:ok, view, html} = live(conn, ~p"/ship?tag=#{first_token}")
 
@@ -172,6 +174,30 @@ defmodule BoonWeb.ShipLiveTest do
     shipment = Operations.get_shipment!(shipment.id)
     assert shipment.entry_count == 2
     assert Enum.map(shipment.entries, & &1.work_package.number) |> Enum.uniq() |> length() == 2
+  end
+
+  test "ship page shows a user-facing error when a scanned item was already shipped", %{
+    conn: conn
+  } do
+    work_package = work_package_fixture()
+    [purchase_order] = work_package.purchase_orders
+
+    token = PalletTagToken.sign(work_package.id, purchase_order.id, 1, "tank")
+
+    assert {:ok, _shipment} =
+             Operations.create_shipment_from_tokens([token], %{submitted_from: "BOON"})
+
+    {:ok, view, _html} = live(conn, ~p"/ship?tag=#{token}")
+
+    view
+    |> element("#submit-shipment")
+    |> render_click()
+
+    rendered = render(view)
+    assert rendered =~ "Some scanned items have already been shipped"
+    assert rendered =~ purchase_order.po_number
+    assert rendered =~ "Tank 1"
+    assert length(Ash.read!(Shipment)) == 1
   end
 
   test "ship page can confirm an unmatched tank shipment", %{conn: conn} do

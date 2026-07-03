@@ -62,7 +62,9 @@ defmodule BoonWeb.ShipmentShowLiveTest do
     assert render(view) =~ "Reprinted packing slip to Chilliwack."
   end
 
-  test "shipment detail shows linked work package cells for multi-work-package shipments", %{conn: conn} do
+  test "shipment detail shows linked work package cells for multi-work-package shipments", %{
+    conn: conn
+  } do
     shipment = multi_work_package_shipment_fixture()
     first_work_package = hd(shipment.entries).work_package
     second_work_package = List.last(shipment.entries).work_package
