@@ -11,10 +11,14 @@ defmodule Boon.Printing.PrintingFoundationTest do
       assert ItemNumber.kind("86-SA-F300") == :false_cover
       assert ItemNumber.kind("86-SA-W400") == :weld_on_lid
       assert ItemNumber.kind("86-SA-L500") == :lid
+      assert ItemNumber.kind("90-86-SA-T100") == :tank
+      assert ItemNumber.kind("90-86-SA-C200") == :cabinet
       assert ItemNumber.kind("86-SA-X999") == nil
 
       assert ItemNumber.label_item?("86-SA-T100")
+      assert ItemNumber.label_item?("90-86-SA-T100")
       refute ItemNumber.label_item?("86-SA-C200")
+      refute ItemNumber.label_item?("90-86-SA-C200")
     end
   end
 

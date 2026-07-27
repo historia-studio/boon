@@ -23,7 +23,9 @@ defmodule Boon.Printing.ItemNumber do
 
   @spec kind(String.t() | nil) :: atom | nil
   def kind(item_number) when is_binary(item_number) do
-    case Regex.run(~r/^86-SA-([TCFWL])/i, String.trim(item_number), capture: :all_but_first) do
+    case Regex.run(~r/^(?:90-)?86-SA-([TCFWL])/i, String.trim(item_number),
+           capture: :all_but_first
+         ) do
       [code] -> Map.get(@kind_map, String.upcase(code))
       _ -> nil
     end

@@ -8,7 +8,7 @@ defmodule Boon.PDF.CamTranTextParser do
 
   alias Boon.ShippingLocation
 
-  @line_pattern ~r/^\s*(\d+)\s+(.+?)\s+(\d{2}\/\d{2}\/\d{4})\s+([\d,]+(?:\.\d+)?)\s+(?:[\d,]+(?:\.\d+)?\s+){1,2}[\d,]+(?:\.\d+)?\s*$/
+  @line_pattern ~r/^\s*(\d+)\s+(.+?)\s+(\d{2}\/\d{2}\/\d{4})\s+([\d,]+(?:\.\d+)?)(?:\s+[A-Za-z]+)?\s+(?:[\d,]+(?:\.\d+)?\s+){1,2}[\d,]+(?:\.\d+)?\s*$/
   @impl true
   def parse_purchase_order(path) do
     with {:ok, text} <- File.read(path) do
@@ -199,9 +199,15 @@ defmodule Boon.PDF.CamTranTextParser do
   end
 
   defp normalize_item_number(value) do
-    value
-    |> String.replace(~r/\s+/u, " ")
-    |> String.trim()
+    normalized_value =
+      value
+      |> String.replace(~r/\s+/u, " ")
+      |> String.trim()
+
+    case Regex.run(~r/^(?:90-)?86-SA-[TCFWL]\S*/i, normalized_value) do
+      [item_number] -> item_number
+      _ -> normalized_value
+    end
   end
 
   defp parse_mmddyyyy(value) do

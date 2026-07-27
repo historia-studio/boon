@@ -93,4 +93,62 @@ defmodule Boon.PDF.CamTranTextParserTest do
     assert length(purchase_order.lines) == 4
     assert warnings == []
   end
+
+  test "parses 90-prefixed item numbers and discards vendor item numbers" do
+    text = """
+    Purchase Order
+    Purchase Order Number : 66585
+    Order Date : 07/21/2026
+    Currency : CAD
+
+    Vendor: BOON-TEK INDUSTRIES LTD Ship To: CAM TRAN CO. LTD.
+    21111-109 AVE 31 SCHRAM STREET
+    EDMONTON, AB, T5S 1X5 SPRUCE GROVE, AB T7X 0G6
+    CA
+
+    Order Date Revision Date Ship Via F.O.B. Currency
+    07/21/2026 07/21/2026 CAD
+    Responsibility Reference Carrier Account Payment Terms
+    PRIYAM 5M009386, SEA FOAM, 1480, NA 30 DAYS
+
+    Line/ Item Number / Description/ Vendor Item Number / Ship Date Quantity Ord UOM Unit Cost Extended Cost
+    1 90-86-SA-T1C2069600 07/21/2026 1 EA 815.00 815.00
+    2 90-86-SA-C1C2023800 07/21/2026 1 EA 325.00 325.00
+    3 90-86-SA-L1C2027900 5RM01 07/21/2026 1 EA 195.00 195.00
+    4 BOX UNIT 07/21/2026 1.00 100.00 100.00
+    """
+
+    assert {:ok, %{purchase_orders: [purchase_order], warnings: warnings}} =
+             CamTranTextParser.parse(text)
+
+    assert purchase_order.po_number == "66585"
+    assert purchase_order.order_date == ~D[2026-07-21]
+    assert purchase_order.revision_date == ~D[2026-07-21]
+    assert purchase_order.reference == "5M009386, SEA FOAM, 1480, NA"
+    assert purchase_order.ship_to == "spruce_grove"
+
+    assert purchase_order.lines == [
+             %{
+               line: 1,
+               item_number: "90-86-SA-T1C2069600",
+               ship_date: ~D[2026-07-21],
+               quantity: 1
+             },
+             %{
+               line: 2,
+               item_number: "90-86-SA-C1C2023800",
+               ship_date: ~D[2026-07-21],
+               quantity: 1
+             },
+             %{
+               line: 3,
+               item_number: "90-86-SA-L1C2027900",
+               ship_date: ~D[2026-07-21],
+               quantity: 1
+             },
+             %{line: 4, item_number: "BOX UNIT", ship_date: ~D[2026-07-21], quantity: 1}
+           ]
+
+    assert warnings == []
+  end
 end
